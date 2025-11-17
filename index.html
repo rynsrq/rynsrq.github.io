@@ -630,7 +630,7 @@
       
       const now=new Date(); const y=now.getFullYear(), m=now.getMonth(); let monthSecs=0; 
       // Loop through ALL date keys in local storage
-      Object.keys(data).forEach(key => { const date = new Date(key); if (date.getFullYear() === y && date.getMonth() === m) { data[key].forEach(s => monthSecs += s.secs); } }); sumMonthEl.textContent = shortHours(monthSecs); 
+      Object.keys(data).forEach(key => { const date = new Date(key); if (date.getUTCFullYear() === targetY && date.getUTCMonth() === targetM) { data[key].forEach(s => monthSecs += s.secs); } }); sumMonthEl.textContent = shortHours(monthSecs); 
 
       updateFab();
       updateMiniVisibility();
@@ -836,7 +836,7 @@ function renderMonths(){
         // Calculate total seconds for this month from cache
         Object.keys(data).forEach(key => {
             const date = new Date(key);
-            if (date.getFullYear() === y && date.getMonth() === m) {
+            if (date.getUTCFullYear() === targetY && date.getUTCMonth() === targetM) {
                 data[key].forEach(s => msecs += s.secs);
             }
         });

@@ -244,6 +244,29 @@ function openModalForDate(dateKey){
   modalContent.innerHTML = "<div style='font-size:16px;padding:10px'>" + h + "h " + m + "m</div>";
   modalOverlay.style.display='flex';
 }
+// Open a week summary modal. rowDates is an array of 7 date keys or nulls.
+function openWeekSummary(rowDates){
+  const data = loadData();
+  let total = 0;
+  const lines = [];
+  rowDates.forEach((key, idx)=>{
+    if(!key){
+      lines.push(`<div style="opacity:0.4;padding:6px 0">—</div>`);
+    } else {
+      const secs = (data[key]||[]).reduce((a,b)=>a + (b.secs||0),0);
+      total += secs;
+      const h = Math.floor(secs/3600);
+      const m = Math.floor((secs%3600)/60);
+      lines.push(`<div style="display:flex;justify-content:space-between;padding:6px 0"><div>${key}</div><div>${h}h ${m}m</div></div>`);
+    }
+  });
+  const th = Math.floor(total/3600);
+  const tm = Math.floor((total%3600)/60);
+  modalTitle.textContent = "Week summary";
+  modalContent.innerHTML = `<div style="font-weight:700;margin-bottom:8px">${th}h ${tm}m</div>` + lines.join('');
+  modalOverlay.style.display = 'flex';
+}
+
 
     function closeModal(){ modalOverlay.style.display='none'; }
 
@@ -260,13 +283,66 @@ function openModalForDate(dateKey){
     let currentYear=(new Date()).getFullYear(), currentMonth=(new Date()).getMonth();
     function startOfWeek(d){ const dd=new Date(d); const day=dd.getDay(); const diff = dd.getDate() - day + (day===0?-6:1); dd.setDate(diff); dd.setHours(0,0,0,0); return dd }
     function sumSecondsForDate(data,y,m,d){ const key = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; const arr = data[key]||[]; return arr.reduce((s,sess)=>s + (sess.secs||0),0) }
-    function renderCalendar(year, month){ calendarGrid.innerHTML=''; monthTitleText.textContent = new Date(year,month,1).toLocaleString(undefined,{month:'long',year:'numeric'});
-      const first=new Date(year,month,1); const leading=(first.getDay()+6)%7; const daysInMonth=new Date(year,month+1,0).getDate(); const total=leading+daysInMonth; const rows=Math.ceil(total/7);
-      const data=loadData(); for(let i=0;i<leading;i++){ const c=document.createElement('div'); calendarGrid.appendChild(c); }
-      for(let d=1; d<=daysInMonth; d++){ const c=document.createElement('div'); const circle=document.createElement('div'); circle.className='circle-day'; circle.textContent=d; const secs = sumSecondsForDate(data,year,month,d); if(secs>0){ const badge=document.createElement('div'); badge.className='badge'; badge.textContent = `${Math.floor(secs/3600)}h ${Math.floor((secs%3600)/60)}m`; circle.appendChild(badge); circle.style.background='rgba(245,183,198,0.08)'; }
-        const cellDateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; const todayStr = new Date().toISOString().slice(0,10); if(cellDateStr===todayStr) circle.classList.add('today'); circle.addEventListener('click', ()=>{ openModalForDate(cellDateStr); }); c.appendChild(circle); calendarGrid.appendChild(c); }
-      const trailing = rows*7 - total; for(let j=0;j<trailing;j++){ const c=document.createElement('div'); calendarGrid.appendChild(c); }
+    
+function renderCalendar(year, month){
+  calendarGrid.innerHTML='';
+  monthTitleText.textContent = new Date(year,month,1).toLocaleString(undefined,{month:'long',year:'numeric'});
+  const first=new Date(year,month,1);
+  const leading=(first.getDay()+6)%7;
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const data=loadData();
+
+  const totalCells = leading + daysInMonth;
+  const rows = Math.ceil(totalCells/7);
+  let dayCounter = 1 - leading;
+
+  for(let r=0;r<rows;r++){
+    const weekRow = document.createElement('div');
+    weekRow.className = 'week-row';
+    weekRow.style.display = 'grid';
+    weekRow.style.gridTemplateColumns = 'repeat(7,1fr)';
+    weekRow.style.gap = '8px';
+    weekRow.style.padding = '6px 0';
+
+    const rowDates = [];
+
+    for(let c=0;c<7;c++){
+      const cell = document.createElement('div');
+      if(dayCounter < 1 || dayCounter > daysInMonth){
+        weekRow.appendChild(cell);
+        rowDates.push(null);
+      } else {
+        const circle = document.createElement('div');
+        circle.className='circle-day';
+        circle.textContent = dayCounter;
+        const key = `${year}-${String(month+1).padStart(2,'0')}-${String(dayCounter).padStart(2,'0')}`;
+        rowDates.push(key);
+        const secs = sumSecondsForDate(loadData(),year,month,dayCounter);
+        if(secs>0){
+          const b=document.createElement('div');
+          b.className='badge'; b.textContent=Math.floor(secs/3600)+'h '+Math.floor((secs%3600)/60)+'m';
+          circle.appendChild(b);
+          circle.style.background='rgba(245,183,198,0.08)';
+        }
+        const todayStr = new Date().toISOString().slice(0,10);
+        if(key===todayStr) circle.classList.add('today');
+
+        // prevent row click when tapping a day
+        circle.addEventListener('click', (ev)=>{ ev.stopPropagation(); openModalForDate(key); });
+
+        cell.appendChild(circle);
+        weekRow.appendChild(cell);
+      }
+      dayCounter++;
     }
+
+    // clicking the week row shows week summary
+    weekRow.addEventListener('click', ()=>{ openWeekSummary(rowDates); });
+
+    calendarGrid.appendChild(weekRow);
+  }
+}
+
 
     document.getElementById('prevMonth').addEventListener('click', ()=>{ currentMonth--; if(currentMonth<0){ currentMonth=11; currentYear--; } renderCalendar(currentYear,currentMonth); });
     document.getElementById('nextMonth').addEventListener('click', ()=>{ currentMonth++; if(currentMonth>11){ currentMonth=0; currentYear++; } renderCalendar(currentYear,currentMonth); });

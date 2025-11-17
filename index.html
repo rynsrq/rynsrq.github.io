@@ -627,10 +627,17 @@
           (sessionsCache[key]||[]).forEach(s=>weekSecs+=s.secs); 
       } 
       sumWeekEl.textContent = shortHours(weekSecs);
-      
-      const now=new Date(); const y=now.getFullYear(), m=now.getMonth(); let monthSecs=0; 
-      // Loop through ALL date keys in local storage
-      Object.keys(data).forEach(key => { const date = new Date(key); if (date.getFullYear() === y && date.getMonth() === m) { data[key].forEach(s => monthSecs += s.secs); } }); sumMonthEl.textContent = shortHours(monthSecs); 
+      // Corrected Code Block (within renderHome)
+const now=new Date(); const y=now.getFullYear(), m=now.getMonth(); let monthSecs=0; 
+// Loop through ALL date keys in sessionsCache
+Object.keys(sessionsCache).forEach(key => { 
+    const date = new Date(key); 
+    if (date.getFullYear() === y && date.getMonth() === m) { 
+        sessionsCache[key].forEach(s => monthSecs += s.secs); 
+    } 
+}); 
+sumMonthEl.textContent = shortHours(monthSecs); 
+
 
       updateFab();
       updateMiniVisibility();

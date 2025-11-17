@@ -824,29 +824,41 @@ function openModalForDate(dateKey){
     document.getElementById('prevMonth').addEventListener('click', ()=>{ currentMonth--; if(currentMonth<0){ currentMonth=11; currentYear--; } renderCalendar(currentYear,currentMonth); updateMiniVisibility(); });
     document.getElementById('nextMonth').addEventListener('click', ()=>{ currentMonth++; if(currentMonth>11){ currentMonth=0; currentYear++; } renderCalendar(currentYear,currentMonth); updateMiniVisibility(); });
 
-    function renderMonths(){ 
-        if (!isAuthReady || !userId) return; 
-        monthsList.innerHTML=''; 
-        const now = new Date();
-        for(let i=0;i<=11;i++){ 
-            const dt=new Date(now.getFullYear(), now.getMonth() - i, 1);
-            const y=dt.getFullYear(), m=dt.getMonth(); 
-            let msecs=0; 
-            
-            Object.keys(sessionsCache).forEach(key => {
-                const date = new Date(key);
-                if (date.getFullYear() === y && date.getMonth() === m) {
-                    sessionsCache[key].forEach(s => msecs += s.secs);
-                }
-            });
+    // NEW CORRECTED RENDER MONTHS FUNCTION FOR FIREBASE VERSION
 
-            const box=document.createElement('div'); 
-            box.className='month-box'; 
-            box.innerHTML=`<div style="font-size:12px">${dt.toLocaleString(undefined,{month:'short',year:'numeric'})}</div><div style="font-weight:700;margin-top:6px">${shortHours(msecs)}</div>`; 
-            monthsList.prepend(box); 
-        } 
-        updateMiniVisibility(); 
-    }
+function renderMonths(){ 
+    // We only need sessionsCache, not loadData()
+    if (!isAuthReady || !userId) return; 
+    monthsList.innerHTML=''; 
+    
+    const data = sessionsCache; // Use the real-time cache
+    const now = new Date();
+    
+    // Loop from the OLDEST month (i=11) down to the NEWEST month (i=0).
+    for(let i=11;i>=0;i--){ 
+        const dt=new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const y=dt.getFullYear(), m=dt.getMonth(); 
+        let msecs=0; 
+        
+        // Calculate total seconds for this month from cache
+        Object.keys(data).forEach(key => {
+            const date = new Date(key);
+            if (date.getFullYear() === y && date.getMonth() === m) {
+                data[key].forEach(s => msecs += s.secs);
+            }
+        });
+
+        const box=document.createElement('div'); 
+        box.className='month-box'; 
+        box.innerHTML=`<div style="font-size:12px">${dt.toLocaleString(undefined,{month:'short',year:'numeric'})}</div><div style="font-weight:700;margin-top:6px">${shortHours(msecs)}</div>`; 
+        
+        // Prepend ensures the newest month (i=0) is placed at the front (far left)
+        monthsList.prepend(box); 
+    } 
+    
+    updateMiniVisibility(); 
+}
+    
 
     // Removed Export/Import Logic
     

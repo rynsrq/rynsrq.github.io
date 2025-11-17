@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurations - App UI</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+
+    <h1>Configurations</h1>
+
+    <div class="config-section">
+        <div class="config-section-title">Categories</div>
+        <div class="category-box">
+            <i class="fa-solid fa-book-open"></i> STUDY
+            <i class="fa-solid fa-angle-right"></i>
+        </div>
+        <div class="add-category">
+            <i class="fa-solid fa-plus"></i> add category
+        </div>
+    </div>
+    
+    <hr style="border: 0; border-top: 1px solid var(--bg-mid); margin: 20px 0;">
+
+    <div class="config-section">
+        <div class="config-section-title">Analytics</div>
+        
+        <div class="config-item">
+            <div>
+                <i class="fa-solid fa-gear"></i> Crash reports
+                <div style="font-size: 0.8rem; opacity: 0.7;">Ask to send crash reports</div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="config-item">
+            <div>
+                <i class="fa-solid fa-gear"></i> System logs
+                <div style="font-size: 0.8rem; opacity: 0.7;">Include system logs in crash reports</div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+    
+    <hr style="border: 0; border-top: 1px solid var(--bg-mid); margin: 20px 0;">
+
+    <div class="config-section">
+        <div class="config-section-title">Storage</div>
+
+        <div class="config-item">
+            <div>
+                <i class="fa-solid fa-folder"></i> Backup
+                <div style="font-size: 0.8rem; opacity: 0.7;">Backup all data regularly to a save place!</div>
+            </div>
+        </div>
+
+        <div class="config-item">
+            <div>
+                <i class="fa-solid fa-file-import"></i> Import
+                <div style="font-size: 0.8rem; opacity: 0.7;">Import from a backup</div>
+            </div>
+        </div>
+    </div>
+    
+    <hr style="border: 0; border-top: 1px solid var(--bg-mid); margin: 20px 0;">
+
+    <div class="config-section">
+        <div class="config-section-title">About</div>
+    </div>
+
+    <footer class="nav-footer">
+        <a href="index.html" class="nav-item">
+            <i class="fa-solid fa-house nav-icon"></i> Home
+        </a>
+        <a href="calendar.html" class="nav-item">
+            <i class="fa-solid fa-calendar-alt nav-icon"></i> Calendar
+        </a>
+        <a href="configurations.html" class="nav-item active">
+            <i class="fa-solid fa-cog nav-icon"></i> Configurations
+        </a>
+    </footer>
+
+</body>
+</html>

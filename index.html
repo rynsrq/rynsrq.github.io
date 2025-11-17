@@ -277,7 +277,7 @@
         
         // Show the requested view
         document.getElementById(viewId).style.display = 'block';
-        document.getElementById('pageTitle').textContent = viewId === 'homeView' ? 'Home' : (viewId === 'calendarView' ? 'Calendar' : 'Configurations');
+        document.getElementById('pageTitle').textContent = viewId === 'homeView' ? 'Home' : (viewId === 'calendarView' ? 'Calendar' : 'Others');
 
         // Manage FAB and Mini Peel visibility
         startBtn.style.display = (viewId === 'homeView' && userId && isAuthReady) ? 'flex' : 'none';

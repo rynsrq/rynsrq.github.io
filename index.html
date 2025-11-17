@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Reading Tracker (Login in Config Tab)</title>
+  <title>Reading Tracker (Online Finalized)</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
   <style>
     :root{
@@ -186,12 +186,6 @@
                 <button class="btn danger" id="logoutBtn">Log Out</button>
             </div>
         </div>
-
-      <div class="section" id="storageSection" style="display:none;">
-        <h3>Storage</h3>
-        <div class="row"><div><strong>Backup</strong><br><small>Export a backup file of your sessions</small></div><div><button id="exportBtn">Export</button></div></div>
-        <div class="row"><div><strong>Import</strong><br><small>Load sessions from a backup JSON</small></div><div><input id="importFile" type="file" accept="application/json"></div></div>
-      </div>
     </main>
 
     <!-- Modal for day sessions -->
@@ -261,7 +255,6 @@
     const logoutBtn = document.getElementById('logoutBtn');
     const logoutControl = document.getElementById('logoutControl');
     const authStatusText = document.getElementById('authStatusText');
-    const storageSection = document.getElementById('storageSection');
 
     // Firestore Path Helpers
     const getSessionsPath = () => `users/${userId}/sessions`;
@@ -358,7 +351,6 @@
                     authStatusText.textContent = `Signed in as: ${user.email}`;
                     authControls.style.display = 'none';
                     logoutControl.style.display = 'block';
-                    storageSection.style.display = 'block'; // Show storage controls
                     
                     if (unsubscribeSessions) {
                         unsubscribeSessions();
@@ -368,7 +360,6 @@
                     await resumeRunningTimer(); 
                     setupRealtimeListener();
 
-                    // If user was on a protected tab, redirect them to Home
                     const currentViewId = document.querySelector('main:not([style*="display: none"]):not([style*="display:none;"])')?.id;
                     if (currentViewId === 'homeView' || currentViewId === 'calendarView' || !currentViewId) {
                          updateView('homeView');
@@ -379,9 +370,8 @@
                     userId = null;
                     sessionsCache = {};
                     authStatusText.textContent = `Status: Not Signed In`;
-                    authControls.style.display = 'block'; // Show login controls
+                    authControls.style.display = 'block'; 
                     logoutControl.style.display = 'none';
-                    storageSection.style.display = 'none'; // Hide storage controls
                     
                     if (timerId) clearInterval(timerId);
                     running = false; startTs = null;
@@ -392,7 +382,6 @@
                         unsubscribeSessions = null;
                     }
 
-                    // Force Configuration view to act as the login gate
                     updateView('configView');
                     setActive(navConfig);
                 }
@@ -644,7 +633,7 @@
       Object.keys(sessionsCache).forEach(key => {
           const date = new Date(key);
           if (date.getFullYear() === y && date.getMonth() === m) {
-              sessionsCache[key].forEach(s => monthSecs += s.secs);
+              sessionsCache[key].forEach(s => msecs += s.secs);
           }
       });
       sumMonthEl.textContent = shortHours(monthSecs);
@@ -858,62 +847,8 @@ function openModalForDate(dateKey){
         updateMiniVisibility(); 
     }
 
-    document.getElementById('exportBtn').addEventListener('click', ()=>{ 
-        if (!userId) return alert('Please sign in to export data.');
-        const data = sessionsCache; 
-        const blob=new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}); 
-        const url=URL.createObjectURL(blob); 
-        const a=document.createElement('a'); 
-        a.href=url; 
-        a.download='reading_sessions_firebase_export.json'; 
-        a.click(); 
-        URL.revokeObjectURL(url); 
-    });
-
-    document.getElementById('importFile').addEventListener('change', (e)=>{ 
-        if (!db || !userId) {
-             alert('Please sign in to import data.');
-             return;
-        }
-        const f=e.target.files[0]; 
-        if(!f) return; 
-        const r=new FileReader(); 
-        
-        r.onload=async function(){ 
-            try{ 
-                const importedData=JSON.parse(r.result);
-                const batch = writeBatch(db);
-                const sessionsColRef = collection(db, getSessionsPath());
-
-                let count = 0;
-                
-                for (const dateKey in importedData) {
-                    importedData[dateKey].forEach(session => {
-                        const sessionData = {
-                            start: session.start,
-                            end: session.end,
-                            dateKey: dateKey,
-                            secs: session.secs,
-                            timestamp: Date.now() 
-                        };
-                        const newDocRef = doc(sessionsColRef);
-                        batch.set(newDocRef, sessionData);
-                        count++;
-                    });
-                }
-                
-                await batch.commit();
-                alert(`Import successful! ${count} sessions added.`);
-                e.target.value = null; 
-            }catch(err){ 
-                console.error("Import Error:", err);
-                alert('Invalid JSON file or import error. Check console.'); 
-            } 
-        }; 
-        r.readAsText(f); 
-    });
-
-
+    // Removed Export/Import Logic
+    
     const navHome=document.getElementById('navHome'), navCalendar=document.getElementById('navCalendar'), navConfig=document.getElementById('navConfig');
     
     navHome.addEventListener('click', ()=>{ setActive(navHome); updateView('homeView'); });

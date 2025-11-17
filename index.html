@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Reading Tracker (Stopwatch + Calendar)</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--accent:#7c3aed;--muted:#94a3b8;--glass:rgba(255,255,255,0.03);--white: #e6eef8}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial,sans-serif;background:linear-gradient(180deg,#071028 0%,#081226 100%);color:var(--white);-webkit-font-smoothing:antialiased}
+    .app{max-width:540px;margin:0 auto;padding:18px;box-sizing:border-box}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+    h1{font-size:18px;margin:0}
+    .menu-btn{background:var(--glass);border:0;padding:10px;border-radius:10px;color:var(--white)}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:16px;border-radius:14px;box-shadow:0 6px 18px rgba(2,6,23,0.6);}
+    .stopwatch{display:flex;flex-direction:column;gap:12px;align-items:center}
+    .time{font-size:34px;font-weight:600}
+    .controls{display:flex;gap:10px}
+    button{background:var(--accent);border:0;padding:10px 14px;border-radius:10px;color:white;font-weight:600}
+    button.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--white)}
+    .small{font-size:12px;color:var(--muted)}
+    nav{position:fixed;left:0;right:0;bottom:18px;padding:10px;display:flex;gap:8px;justify-content:center}
+    .nav-item{flex:1;max-width:110px;background:var(--card);padding:10px;border-radius:12px;text-align:center;font-size:13px}
+    /* Calendar */
+    .calendar{margin-top:12px}
+    .month-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+    .day{padding:10px;border-radius:10px;background:rgba(255,255,255,0.01);min-height:64px;font-size:12px}
+    .day .dnum{font-weight:700}
+    .day .hours{margin-top:6px;font-size:11px;color:var(--muted)}
+    .today{outline:2px solid rgba(124,58,237,0.28)}
+    /* Summary boxes */
+    .summary-row{display:flex;gap:8px;margin-top:12px}
+    .summary{flex:1;background:var(--card);padding:10px;border-radius:10px;text-align:center}
+    /* Responsive tweaks */
+    @media (max-width:420px){.time{font-size:28px}.controls button{padding:10px 10px}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Reading Tracker</h1>
+      <button id="menuBtn" class="menu-btn">Menu</button>
+    </header>
+
+    <div id="mainCard" class="card">
+      <section class="stopwatch" id="stopwatchSection">
+        <div class="time" id="display">00:00:00</div>
+        <div class="small" id="status">stopped • ready</div>
+        <div class="controls">
+          <button id="startBtn">Start</button>
+          <button id="lapBtn" class="secondary">Save</button>
+          <button id="resetBtn" class="secondary">Reset</button>
+        </div>
+        <div class="small" style="margin-top:8px">Last session: <span id="lastSession">—</span></div>
+      </section>
+
+      <section class="calendar" id="calendarSection" style="display:none">
+        <div class="month-header">
+          <button id="prevMonth" class="secondary">◀</button>
+          <div id="monthTitle">Month</div>
+          <button id="nextMonth" class="secondary">▶</button>
+        </div>
+        <div class="grid" id="calendarGrid"></div>
+        <div class="summary-row">
+          <div class="summary">Today<br><strong id="sumToday">0h 0m</strong></div>
+          <div class="summary">This Week<br><strong id="sumWeek">0h 0m</strong></div>
+          <div class="summary">This Month<br><strong id="sumMonth">0h 0m</strong></div>
+        </div>
+      </section>
+
+      <section id="yearSection" style="display:none; margin-top:12px">
+        <div class="small">Last 12 months</div>
+        <div style="display:flex;gap:8px;margin-top:8px;overflow:auto;padding-bottom:8px">
+          <div id="monthsList" style="display:flex;gap:8px"></div>
+        </div>
+      </section>
+
+    </div>
+
+    <nav>
+      <div class="nav-item" id="navStopwatch">Stopwatch</div>
+      <div class="nav-item" id="navCalendar">Calendar</div>
+      <div class="nav-item" id="navYear">Year</div>
+    </nav>
+  </div>
+
+  <script>
+    // ---------- Storage schema ----------
+    // localStorage key: 'reading_sessions'
+    // value: JSON object where keys are dates in YYYY-MM-DD and value is array of sessions {start:iso, end:iso, secs:number}
+
+    const STORAGE_KEY = 'reading_sessions_v1';
+
+    function loadData(){
+      try{const raw = localStorage.getItem(STORAGE_KEY); return raw?JSON.parse(raw):{} }catch(e){return{}}}
+    function saveData(data){localStorage.setItem(STORAGE_KEY, JSON.stringify(data))}
+
+    // ---------- Stopwatch logic ----------
+    let running=false, startTs=null, elapsed=0, timerId=null;
+    const display = document.getElementById('display');
+    const status = document.getElementById('status');
+    const startBtn = document.getElementById('startBtn');
+    const lapBtn = document.getElementById('lapBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const lastSessionEl = document.getElementById('lastSession');
+
+    function formatHMS(totalSecs){
+      totalSecs = Math.floor(totalSecs);
+      const h = Math.floor(totalSecs/3600); const m = Math.floor((totalSecs%3600)/60); const s = totalSecs%60;
+      return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+    }
+
+    function updateDisplay(){
+      const now = Date.now();
+      const secs = elapsed + (running ? Math.floor((now - startTs)/1000) : 0);
+      display.textContent = formatHMS(secs);
+      status.textContent = running ? 'running' : 'stopped • ready';
+    }
+
+    startBtn.addEventListener('click', ()=>{
+      if(!running){
+        running = true; startTs = Date.now(); startBtn.textContent = 'Stop'; status.textContent = 'running';
+        timerId = setInterval(updateDisplay, 300);
+      } else {
+        // stop and record session
+        running = false; clearInterval(timerId); startBtn.textContent = 'Start';
+        const endTs = Date.now(); const secs = Math.floor((endTs - startTs)/1000);
+        elapsed = 0; updateDisplay();
+        saveSession(startTs, endTs, secs);
+      }
+    });
+
+    lapBtn.addEventListener('click', ()=>{
+      if(!running){alert('Start the stopwatch first to record a session.') ; return}
+      const endTs = Date.now(); const secs = Math.floor((endTs - startTs)/1000);
+      // record and continue from now
+      saveSession(startTs, endTs, secs);
+      // reset start time so next session starts fresh
+      startTs = Date.now();
+      updateDisplay();
+    });
+
+    resetBtn.addEventListener('click', ()=>{
+      if(running){if(!confirm('Stop and discard current running session?')) return; running=false; clearInterval(timerId); startBtn.textContent='Start';}
+      elapsed = 0; startTs = null; updateDisplay();
+    });
+
+    function saveSession(startMs, endMs, secs){
+      const data = loadData();
+      const dateKey = new Date(startMs).toISOString().slice(0,10); // assign by start date
+      if(!data[dateKey]) data[dateKey]=[];
+      data[dateKey].push({start:new Date(startMs).toISOString(), end:new Date(endMs).toISOString(), secs});
+      saveData(data);
+      lastSessionEl.textContent = `${formatHMS(secs)} on ${dateKey}`;
+      renderCalendar(currentYear, currentMonth);
+      renderSummaries();
+    }
+
+    // ---------- Calendar and summaries ----------
+    const calendarGrid = document.getElementById('calendarGrid');
+    const monthTitle = document.getElementById('monthTitle');
+    const sumToday = document.getElementById('sumToday');
+    const sumWeek = document.getElementById('sumWeek');
+    const sumMonth = document.getElementById('sumMonth');
+    const monthsList = document.getElementById('monthsList');
+
+    const now = new Date();
+    let currentYear = now.getFullYear(), currentMonth = now.getMonth();
+
+    function startOfWeek(d){ const dd=new Date(d); const day = dd.getDay(); const diff = dd.getDate() - day + (day===0?-6:1); dd.setDate(diff); dd.setHours(0,0,0,0); return dd }
+
+    function sumSecondsForDate(data, y,m,d){ const key = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; const arr = data[key]||[]; return arr.reduce((s,sess)=>s+ (sess.secs||0),0) }
+
+    function renderCalendar(year, month){
+      calendarGrid.innerHTML='';
+      monthTitle.textContent = new Date(year,month,1).toLocaleString(undefined,{month:'long',year:'numeric'});
+      const first = new Date(year,month,1); const startDay = first.getDay();
+      const daysInMonth = new Date(year, month+1, 0).getDate();
+      // show leading blanks for Sunday-start calendar (Mon start? We'll start week on Mon)
+      // We'll compute index for Monday start
+      const leading = (first.getDay() + 6) % 7; // 0..6 number of blanks before day 1
+      const totalCells = leading + daysInMonth;
+      const rows = Math.ceil(totalCells/7);
+
+      const data = loadData();
+
+      for(let i=0;i<leading;i++){ const cell = document.createElement('div'); cell.className='day'; cell.innerHTML=''; calendarGrid.appendChild(cell) }
+
+      for(let d=1; d<=daysInMonth; d++){
+        const cell = document.createElement('div'); cell.className='day';
+        const dnum = document.createElement('div'); dnum.className='dnum'; dnum.textContent=d; cell.appendChild(dnum);
+        const secs = sumSecondsForDate(data, year, month, d);
+        const hoursStr = formatHoursShort(secs);
+        const hoursEl = document.createElement('div'); hoursEl.className='hours'; hoursEl.textContent = hoursStr;
+        cell.appendChild(hoursEl);
+        const cellDateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const todayStr = new Date().toISOString().slice(0,10);
+        if(cellDateStr===todayStr) cell.classList.add('today');
+        cell.addEventListener('click', ()=>{ alert(`${cellDateStr}: ${hoursStr}`) });
+        calendarGrid.appendChild(cell);
+      }
+
+      // fill trailing blanks
+      const trailing = rows*7 - totalCells;
+      for(let j=0;j<trailing;j++){ const cell=document.createElement('div');cell.className='day';calendarGrid.appendChild(cell)}
+    }
+
+    function formatHoursShort(totalSecs){ if(!totalSecs) return '0h 0m'; const h=Math.floor(totalSecs/3600); const m=Math.floor((totalSecs%3600)/60); return `${h}h ${m}m` }
+
+    document.getElementById('prevMonth').addEventListener('click', ()=>{ currentMonth--; if(currentMonth<0){currentMonth=11; currentYear--} renderCalendar(currentYear,currentMonth) })
+    document.getElementById('nextMonth').addEventListener('click', ()=>{ currentMonth++; if(currentMonth>11){currentMonth=0; currentYear++} renderCalendar(currentYear,currentMonth) })
+
+    function renderSummaries(){
+      const data = loadData();
+      const today = new Date(); const todayKey = today.toISOString().slice(0,10);
+      const todaySecs = (data[todayKey]||[]).reduce((s,sess)=>s+sess.secs,0);
+      sumToday.textContent = formatHoursShort(todaySecs);
+
+      // week: from monday start
+      const startW = startOfWeek(today);
+      let weekSecs=0; for(let i=0;i<7;i++){ const d=new Date(startW); d.setDate(startW.getDate()+i); const key=d.toISOString().slice(0,10); (data[key]||[]).forEach(s=>weekSecs+=s.secs) }
+      sumWeek.textContent = formatHoursShort(weekSecs);
+
+      // month
+      const year=today.getFullYear(); const month=today.getMonth(); let monthSecs=0; const daysInMonth=new Date(year,month+1,0).getDate(); for(let d=1;d<=daysInMonth;d++){ monthSecs += sumSecondsForDate(data,year,month,d) }
+      sumMonth.textContent = formatHoursShort(monthSecs);
+
+      // last 12 months list
+      monthsList.innerHTML=''; for(let i=11;i>=0;i--){ const dt = new Date(); dt.setMonth(dt.getMonth()-i); const y=dt.getFullYear(), m=dt.getMonth(); // sum month
+        let msecs=0; const mdays = new Date(y,m+1,0).getDate(); for(let d=1; d<=mdays; d++) msecs += sumSecondsForDate(data,y,m,d);
+        const box = document.createElement('div'); box.style.minWidth='88px'; box.style.background='rgba(255,255,255,0.02)'; box.style.padding='8px'; box.style.borderRadius='8px'; box.style.textAlign='center'; box.innerHTML = `<div style="font-size:12px">${dt.toLocaleString(undefined,{month:'short',year:'numeric'})}</div><div style="font-weight:700">${formatHoursShort(msecs)}</div>`; monthsList.appendChild(box);
+      }
+    }
+
+    // ---------- Navigation ----------
+    const navStopwatch = document.getElementById('navStopwatch');
+    const navCalendar = document.getElementById('navCalendar');
+    const navYear = document.getElementById('navYear');
+    const stopwatchSection = document.getElementById('stopwatchSection');
+    const calendarSection = document.getElementById('calendarSection');
+    const yearSection = document.getElementById('yearSection');
+
+    navStopwatch.addEventListener('click', ()=>{ stopwatchSection.style.display='flex'; calendarSection.style.display='none'; yearSection.style.display='none'; });
+    navCalendar.addEventListener('click', ()=>{ stopwatchSection.style.display='none'; calendarSection.style.display='block'; yearSection.style.display='none'; renderCalendar(currentYear,currentMonth); renderSummaries(); });
+    navYear.addEventListener('click', ()=>{ stopwatchSection.style.display='none'; calendarSection.style.display='none'; yearSection.style.display='block'; renderSummaries(); });
+
+    // init
+    updateDisplay(); renderCalendar(currentYear,currentMonth); renderSummaries();
+
+    // small UX: long-press support for start/stop on mobile
+    let touchStartT=0; startBtn.addEventListener('touchstart', e=>{ touchStartT=Date.now(); });
+    startBtn.addEventListener('touchend', e=>{ if(Date.now()-touchStartT>800){ // long press -> reset
+      if(confirm('Long-press detected: reset recorded sessions for today?')){ const key=new Date().toISOString().slice(0,10); const data=loadData(); if(data[key]){ delete data[key]; saveData(data); renderCalendar(currentYear,currentMonth); renderSummaries(); alert('Today sessions cleared') } }
+    }});
+
+    // Export / Import helper (dev)
+    window.exportData = ()=>{ const data = loadData(); const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}); const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='reading_sessions.json'; a.click(); URL.revokeObjectURL(url); }
+    window.importData = (json)=>{ try{ const obj = typeof json==='string'?JSON.parse(json):json; saveData(obj); renderCalendar(currentYear,currentMonth); renderSummaries(); alert('Imported') }catch(e){alert('Invalid JSON') }}
+
+    // instructive: show counts
+    (function showLast(){ const data = loadData(); const keys = Object.keys(data).sort().reverse(); if(keys.length){ const k=keys[0]; const s = data[k]; const total = s.reduce((a,b)=>a+b.secs,0); lastSessionEl.textContent = `${formatHMS(total)} on ${k}` } })();
+
+  </script>
+</body>
+</html>

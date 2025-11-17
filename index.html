@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Reading Tracker (Offline Timer)</title>
+  <title>Reading Tracker (Login in Config Tab)</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
   <style>
     :root{
@@ -90,6 +90,36 @@
     .modal h4{margin:0 0 8px}
     .modal .sess-row{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:10px;background:rgba(255,255,255,0.02);margin-bottom:8px}
     .modal label{font-size:13px;color:var(--muted)}
+    
+    .auth-form input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(0,0,0,0.1);
+      color: var(--white);
+      font-size: 16px;
+    }
+    .auth-form button {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      font-weight: 700;
+      margin-top: 10px;
+    }
+    .auth-form .primary {
+      background: var(--accent);
+      color: var(--accent-text);
+    }
+    .auth-form .secondary {
+      background: var(--panel);
+      color: var(--white);
+      margin-top: 5px;
+    }
+
+
     .bottom-nav{position:fixed;left:0;right:0;bottom:0;height:76px;background:#3b2f24;display:flex;gap:8px;align-items:center;justify-content:space-around;padding:12px;border-top-left-radius:12px;border-top-right-radius:12px;z-index:39}
     .nav-item{flex:1;text-align:center;color:var(--muted);font-weight:700;padding:8px;border-radius:12px}
     .nav-item.active{background:#2a2118;padding:10px;border-radius:18px;color:var(--white)}
@@ -134,9 +164,30 @@
       </div>
     </main>
 
-    <!-- CONFIG -->
+    <!-- CONFIG / LOGIN GATE -->
     <main id="configView" style="display:none">
-      <div class="section">
+        
+        <div class="section" id="authSection">
+            <h3>Account Access</h3>
+            <p style="color: var(--muted); margin-bottom: 20px; font-size: 14px;">Log in to sync your data across all devices.</p>
+            <div id="authStatusRow">
+                <div id="authStatusText" style="font-weight: 700; color: var(--accent); margin-bottom: 10px;">Status: Loading...</div>
+            </div>
+
+            <div class="auth-form" id="authControls" style="display:none;">
+                <input type="email" id="authEmail" placeholder="Email Address">
+                <input type="password" id="authPassword" placeholder="Password (min 6 chars)">
+                <button id="loginBtn" class="primary">Log In</button>
+                <button id="signupBtn" class="secondary">Create Account</button>
+                <p id="authMessage" style="color: #ffb8b8; margin-top: 10px; font-size: 13px; height: 1.2em;"></p>
+            </div>
+
+            <div id="logoutControl" style="text-align:center; margin-top:15px; display:none;">
+                <button class="btn danger" id="logoutBtn">Log Out</button>
+            </div>
+        </div>
+
+      <div class="section" id="storageSection" style="display:none;">
         <h3>Storage</h3>
         <div class="row"><div><strong>Backup</strong><br><small>Export a backup file of your sessions</small></div><div><button id="exportBtn">Export</button></div></div>
         <div class="row"><div><strong>Import</strong><br><small>Load sessions from a backup JSON</small></div><div><input id="importFile" type="file" accept="application/json"></div></div>
@@ -160,7 +211,7 @@
     <!-- Mini today's pill (hidden by default, shows when total time > 0 or running) -->
     <div id="miniToday" class="mini-today" aria-hidden="true"></div>
 
-    <button class="fab" id="startBtn"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M5 3v18l15-9L5 3z"/></svg> Start</button>
+    <button class="fab" id="startBtn" style="display:none;"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M5 3v18l15-9L5 3z"/></svg> Start</button>
 
   </div>
 
@@ -173,7 +224,13 @@
   <script type="module">
     // --- FIREBASE CONFIGURATION AND INITIALIZATION ---
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { 
+        getAuth, 
+        onAuthStateChanged, 
+        signOut,
+        createUserWithEmailAndPassword,
+        signInWithEmailAndPassword
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, getDoc, addDoc, deleteDoc, onSnapshot, collection, query, writeBatch, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     // PASTE YOUR CONFIG HERE (MUST BE UPDATED)
@@ -191,74 +248,192 @@
     let auth;
     let userId = null;
     let isAuthReady = false;
-    let sessionsCache = {}; // Local cache of all sessions
+    let sessionsCache = {};
+    let unsubscribeSessions = null; 
+
+    // DOM References for Auth
+    const authControls = document.getElementById('authControls');
+    const authEmail = document.getElementById('authEmail');
+    const authPassword = document.getElementById('authPassword');
+    const loginBtn = document.getElementById('loginBtn');
+    const signupBtn = document.getElementById('signupBtn');
+    const authMessage = document.getElementById('authMessage');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const logoutControl = document.getElementById('logoutControl');
+    const authStatusText = document.getElementById('authStatusText');
+    const storageSection = document.getElementById('storageSection');
 
     // Firestore Path Helpers
     const getSessionsPath = () => `users/${userId}/sessions`;
-    // New path for the persistent running timer state
     const getRunningStateDocRef = () => doc(db, `users/${userId}/state/runningTimer`);
 
+    // --- NAVIGATION AND VIEW CONTROL ---
+    function updateView(viewId) {
+        // Protect Home and Calendar views
+        if ((viewId === 'homeView' || viewId === 'calendarView') && !userId) {
+            viewId = 'configView'; // Force login gate in config tab
+            setActive(navConfig);
+            alert("Please sign in on the Configurations tab to view data.");
+        }
+
+        // Hide all main views
+        document.getElementById('homeView').style.display = 'none';
+        document.getElementById('calendarView').style.display = 'none';
+        document.getElementById('configView').style.display = 'none';
+        
+        // Show the requested view
+        document.getElementById(viewId).style.display = 'block';
+        document.getElementById('pageTitle').textContent = viewId === 'homeView' ? 'Home' : (viewId === 'calendarView' ? 'Calendar' : 'Configurations');
+
+        // Manage FAB and Mini Peel visibility
+        startBtn.style.display = (viewId === 'homeView' && userId && isAuthReady) ? 'flex' : 'none';
+        
+        if (userId) {
+            // Render when switching to a main view if authenticated
+            if (viewId === 'homeView') renderHome();
+            if (viewId === 'calendarView') {
+                renderCalendar(currentYear, currentMonth);
+                renderMonths();
+            }
+        }
+        updateMiniVisibility();
+    }
+
+    // AUTHENTICATION HANDLERS
+    function setAuthError(message) {
+        authMessage.textContent = message;
+        setTimeout(() => authMessage.textContent = '', 5000);
+    }
+
+    loginBtn.addEventListener('click', async () => {
+        const email = authEmail.value;
+        const password = authPassword.value;
+        if (!email || password.length < 6) return setAuthError('Enter valid email and password (min 6 chars).');
+
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+        } catch (error) {
+            console.error("Login Error:", error);
+            setAuthError(error.message.replace('Firebase: Error (auth/', '').replace(').', ''));
+        }
+    });
+
+    signupBtn.addEventListener('click', async () => {
+        const email = authEmail.value;
+        const password = authPassword.value;
+        if (!email || password.length < 6) return setAuthError('Enter valid email and password (min 6 chars).');
+        
+        try {
+            await createUserWithEmailAndPassword(auth, email, password);
+            setAuthError('Account created successfully! Auto-logging in.');
+        } catch (error) {
+            console.error("Signup Error:", error);
+            setAuthError(error.message.replace('Firebase: Error (auth/', '').replace(').', ''));
+        }
+    });
+
+    logoutBtn.addEventListener('click', async () => {
+        if (running) {
+             alert("Cannot log out: please stop the active timer first.");
+             return;
+        }
+        try {
+            await signOut(auth);
+        } catch (e) {
+            console.error("Logout Error:", e);
+        }
+    });
+
+    // FIREBASE INIT
     async function initFirebase() {
         try {
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
 
-            await signInAnonymously(auth);
-
             onAuthStateChanged(auth, async (user) => {
+                isAuthReady = true;
                 if (user) {
                     userId = user.uid;
-                    isAuthReady = true;
-
-                    // CHECK FOR OFFLINE RUNNING SESSION
-                    const stateDoc = await getDoc(getRunningStateDocRef());
-                    if (stateDoc.exists() && stateDoc.data().isRunning) {
-                        const state = stateDoc.data();
-                        // Set the application state based on the saved data
-                        running = true;
-                        startTs = state.startTs;
-                        
-                        // Update the FAB immediately and restart the display timer
-                        updateFab(); 
-                        timerId = setInterval(()=>{ updateFab(); renderRunningSession(); }, 300);
-                        
-                        // Update UI elements for running state
-                        startBtn.textContent = 'Stop'; 
-                        startBtn.style.background = 'var(--accent)'; 
-                        startBtn.style.color = 'var(--accent-text)'; 
-                        miniToday.classList.add('running');
+                    authStatusText.textContent = `Signed in as: ${user.email}`;
+                    authControls.style.display = 'none';
+                    logoutControl.style.display = 'block';
+                    storageSection.style.display = 'block'; // Show storage controls
+                    
+                    if (unsubscribeSessions) {
+                        unsubscribeSessions();
+                        unsubscribeSessions = null;
                     }
-
-                    // Start rendering and listening for data only after auth is ready
-                    renderHome();
-                    renderCalendar(currentYear, currentMonth);
-                    renderMonths();
+                    
+                    await resumeRunningTimer(); 
                     setupRealtimeListener();
 
+                    // If user was on a protected tab, redirect them to Home
+                    const currentViewId = document.querySelector('main:not([style*="display: none"]):not([style*="display:none;"])')?.id;
+                    if (currentViewId === 'homeView' || currentViewId === 'calendarView' || !currentViewId) {
+                         updateView('homeView');
+                         setActive(navHome);
+                    }
+
                 } else {
-                    console.log("No user signed in.");
+                    userId = null;
+                    sessionsCache = {};
+                    authStatusText.textContent = `Status: Not Signed In`;
+                    authControls.style.display = 'block'; // Show login controls
+                    logoutControl.style.display = 'none';
+                    storageSection.style.display = 'none'; // Hide storage controls
+                    
+                    if (timerId) clearInterval(timerId);
+                    running = false; startTs = null;
+                    updateFab(); 
+                    
+                    if (unsubscribeSessions) {
+                        unsubscribeSessions();
+                        unsubscribeSessions = null;
+                    }
+
+                    // Force Configuration view to act as the login gate
+                    updateView('configView');
+                    setActive(navConfig);
                 }
             });
         } catch (error) {
             console.error("Firebase Initialization Error:", error);
-            document.getElementById('sessionList').innerHTML = `<div style="color:red;padding:20px;text-align:center;">
-                Error loading data. Check console for Firebase setup issues.
-            </div>`;
+            authStatusText.textContent = `Error: Check Firebase config/console.`;
         }
     }
     
+    async function resumeRunningTimer() {
+        if (!db || !userId) return;
+
+        const stateDoc = await getDoc(getRunningStateDocRef());
+        if (stateDoc.exists() && stateDoc.data().isRunning) {
+            const state = stateDoc.data();
+            running = true;
+            startTs = state.startTs;
+            
+            updateFab(); 
+            timerId = setInterval(()=>{ updateFab(); renderRunningSession(); }, 300);
+            
+            startBtn.textContent = 'Stop'; 
+            startBtn.style.background = 'var(--accent)'; 
+            startBtn.style.color = 'var(--accent-text)'; 
+            miniToday.classList.add('running');
+        }
+    }
+
+
     // --- REAL-TIME DATA LISTENER ---
     function setupRealtimeListener() {
         if (!db || !userId) return;
 
         const q = query(collection(db, getSessionsPath()), orderBy("start", "desc"));
 
-        onSnapshot(q, (snapshot) => {
+        unsubscribeSessions = onSnapshot(q, (snapshot) => {
             sessionsCache = {};
             snapshot.docs.forEach(doc => {
                 const session = doc.data();
-                session.id = doc.id; // Store Firestore document ID
+                session.id = doc.id; 
                 const dateKey = session.dateKey; 
 
                 if (!sessionsCache[dateKey]) {
@@ -266,7 +441,6 @@
                 }
                 sessionsCache[dateKey].push(session);
             });
-            // Re-render UI based on the new data
             renderHome();
             renderCalendar(currentYear, currentMonth);
             renderMonths();
@@ -275,7 +449,6 @@
         });
     }
 
-    // Function to get data from cache (replaces loadData)
     function getSessionsByDate(dateKey) {
         return sessionsCache[dateKey] || [];
     }
@@ -301,35 +474,30 @@
     function shortHours(total){ if(!total) return '0h 0m'; const h=Math.floor(total/3600); const m=Math.floor((total%3600)/60); return `${h}h ${m}m` }
     function fmtTime(iso){ const d=new Date(iso); return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
 
-    // Saves the completed session
     async function saveSession(start, end){ 
         if (!db || !userId) return;
         const startDate=new Date(start);
-        // Duration calculation MUST use the saved startTs and the current end time (Date.now())
         const secs=Math.floor((new Date(end)-new Date(start))/1000); 
 
         const sessionData = {
             start: startDate.toISOString(),
             end: new Date(end).toISOString(),
-            dateKey: startDate.toISOString().slice(0, 10), // Used for querying/grouping
+            dateKey: startDate.toISOString().slice(0, 10),
             secs: secs,
-            timestamp: Date.now() // For initial sorting if needed
+            timestamp: Date.now()
         };
 
         try {
             await addDoc(collection(db, getSessionsPath()), sessionData);
-            // Note: renderHome/updateMiniVisibility called automatically by onSnapshot
         } catch (e) {
             console.error("Error adding document: ", e);
             alert("Error saving session. Check console.");
         }
     }
 
-    // Saves the running state to Firestore for persistence
     async function saveRunningState(startTs) {
         if (!db || !userId) return;
         try {
-            // Use writeBatch to ensure state update and session save are atomic, though for start it's simple
             const batch = writeBatch(db);
             batch.set(getRunningStateDocRef(), { isRunning: true, startTs: startTs });
             await batch.commit();
@@ -339,25 +507,23 @@
         }
     }
 
-    // Deletes the running state from Firestore
     async function deleteRunningState() {
         if (!db || !userId) return;
         try {
             await deleteDoc(getRunningStateDocRef());
         } catch (e) {
             console.error("Error deleting running state:", e);
-            // Non-critical, just log
         }
     }
 
     startBtn.addEventListener('click', async ()=>{
+      if (!userId) return alert('Please sign in to start tracking.');
       if(!running){ 
-          // --- START TIMER ---
           const now = Date.now();
           running = true; 
           startTs = now; 
           
-          await saveRunningState(now); // Save persistent state
+          await saveRunningState(now);
 
           startBtn.textContent = 'Stop'; 
           startBtn.style.background = 'var(--accent)'; 
@@ -367,35 +533,30 @@
           timerId = setInterval(()=>{ updateFab(); renderRunningSession(); }, 300); 
       }
       else { 
-          // --- STOP TIMER ---
           const end = Date.now();
-          // The duration calculation uses the persistent startTs
           
-          // Clear app state
           running = false; 
           clearInterval(timerId); 
           timerId = null;
 
-          await deleteRunningState(); // Clear persistent state
+          await deleteRunningState();
 
-          // Save the final session using the persistent startTs
           await saveSession(startTs, end); 
           
-          // Reset UI
           startTs = null;
           startBtn.textContent = 'Start'; 
           startBtn.style.background = 'var(--accent)'; 
           startBtn.style.color = 'var(--accent-text)'; 
           miniToday.classList.remove('running');
-          updateFab(); // Rerender totals
+          updateFab();
       }
     });
 
     function calculateTotalTodaySecs(isRunning, startTimestamp) {
+        if (!userId) return 0;
         const todayKey = new Date().toISOString().slice(0, 10);
         let totalSecs = (sessionsCache[todayKey] || []).reduce((a, b) => a + b.secs, 0);
         if (isRunning && startTimestamp) {
-            // This is the core logic: calculate time since the persistent startTs
             totalSecs += Math.floor((Date.now() - startTimestamp) / 1000);
         }
         return totalSecs;
@@ -405,10 +566,8 @@
       const totalTodaySecs = calculateTotalTodaySecs(running, startTs);
       const totalHtml = shortHours(totalTodaySecs);
 
-      // 1. Update Left Peel (Mini Today) - Always Today's Total Active Time
       miniToday.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M10 8h4v8h-4z"/></svg> ${totalHtml}`;
 
-      // 2. Update Right Peel (FAB) - Running Time or Start Button
       if(running && startTs){ 
         const secs=Math.floor((Date.now()-startTs)/1000); 
         const timeHtml = secsToHMS(secs);
@@ -423,9 +582,9 @@
     function renderRunningSession(){ 
         if(!running || !startTs) return; 
         
-        const secs=Math.floor((Date.now()-startTs)/1000); // Uses persistent startTs
+        const secs=Math.floor((Date.now()-startTs)/1000); 
         const virtual={
-            start: new Date(startTs).toISOString(), // Use persistent startTs
+            start: new Date(startTs).toISOString(), 
             end: new Date().toISOString(), 
             secs: secs
         }; 
@@ -442,7 +601,7 @@
     }
 
     function renderHome(){ 
-      if (!isAuthReady) return; 
+      if (!isAuthReady || !userId) return; 
 
       const todayKey=new Date().toISOString().slice(0,10); 
       const arr = getSessionsByDate(todayKey).sort((a, b) => new Date(b.start) - new Date(a.start));
@@ -450,7 +609,6 @@
       sessionList.innerHTML='';
 
       if(running && startTs){ 
-        // This is where the virtual running session is added
         const virtual=document.createElement('div'); 
         virtual.className='session virtual'; 
         virtual.innerHTML=`<div class="left"><div class="time-s">${fmtTime(new Date(startTs).toISOString())}</div><div class="dur">── 0 min ──</div></div><div class="actions"></div><div class="right">${fmtTime(new Date().toISOString())}</div>`; 
@@ -468,7 +626,6 @@
         attachSwipeHandlers(el, todayKey, s.id);
       });
 
-      // Calculate Summary Totals from Cache
       const todaySecs = (sessionsCache[todayKey] || []).reduce((a,b)=>a + b.secs,0); 
       sumTodayEl.textContent = shortHours(todaySecs);
       
@@ -525,7 +682,6 @@
                 if(docId){
                     deleteSessionWithUndo(docId);
                 } else if(running) { 
-                    // Swipe left on the virtual running session acts as Stop
                     startBtn.click(); 
                 } 
             } 
@@ -636,7 +792,7 @@ function openModalForDate(dateKey){
     }
 
     function renderCalendar(year, month){ 
-      if (!isAuthReady) return; 
+      if (!isAuthReady || !userId) return; 
       calendarGrid.innerHTML=''; 
       monthTitleText.textContent = new Date(year,month,1).toLocaleString(undefined,{month:'long',year:'numeric'});
       const first=new Date(year,month,1); const leading=(first.getDay()+6)%7; const daysInMonth=new Date(year,month+1,0).getDate(); const total=leading+daysInMonth; const rows=Math.ceil(total/7);
@@ -666,7 +822,7 @@ function openModalForDate(dateKey){
         const totalTodaySecs = calculateTotalTodaySecs(running, startTs);
         const showValue = running || (totalTodaySecs > 0); 
 
-        if(showValue){
+        if(showValue && userId){
           miniToday.classList.add('visible');
           updateFab();
         } else {
@@ -679,7 +835,7 @@ function openModalForDate(dateKey){
     document.getElementById('nextMonth').addEventListener('click', ()=>{ currentMonth++; if(currentMonth>11){ currentMonth=0; currentYear++; } renderCalendar(currentYear,currentMonth); updateMiniVisibility(); });
 
     function renderMonths(){ 
-        if (!isAuthReady) return; 
+        if (!isAuthReady || !userId) return; 
         monthsList.innerHTML=''; 
         const now = new Date();
         for(let i=0;i<=11;i++){ 
@@ -703,6 +859,7 @@ function openModalForDate(dateKey){
     }
 
     document.getElementById('exportBtn').addEventListener('click', ()=>{ 
+        if (!userId) return alert('Please sign in to export data.');
         const data = sessionsCache; 
         const blob=new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}); 
         const url=URL.createObjectURL(blob); 
@@ -715,7 +872,7 @@ function openModalForDate(dateKey){
 
     document.getElementById('importFile').addEventListener('change', (e)=>{ 
         if (!db || !userId) {
-             alert('Firebase not ready. Please try again.');
+             alert('Please sign in to import data.');
              return;
         }
         const f=e.target.files[0]; 
@@ -757,12 +914,18 @@ function openModalForDate(dateKey){
     });
 
 
-    const navHome=document.getElementById('navHome'), navCalendar=document.getElementById('navCalendar'), navConfig=document.getElementById('navConfig'); const homeView=document.getElementById('homeView'), calendarView=document.getElementById('calendarView'), configView=document.getElementById('configView');
-    function setActive(el){ document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active')); el.classList.add('active'); }
-    navHome.addEventListener('click', ()=>{ setActive(navHome); homeView.style.display='block'; calendarView.style.display='none'; configView.style.display='none'; document.getElementById('pageTitle').textContent='Home'; updateMiniVisibility(); });
-    navCalendar.addEventListener('click', ()=>{ setActive(navCalendar); homeView.style.display='none'; calendarView.style.display='block'; configView.style.display='none'; document.getElementById('pageTitle').textContent='Calendar'; renderCalendar(currentYear,currentMonth); renderMonths(); updateMiniVisibility(); });
-    navConfig.addEventListener('click', ()=>{ setActive(navConfig); homeView.style.display='none'; calendarView.style.display='none'; configView.style.display='block'; document.getElementById('pageTitle').textContent='Configurations'; updateMiniVisibility(); });
+    const navHome=document.getElementById('navHome'), navCalendar=document.getElementById('navCalendar'), navConfig=document.getElementById('navConfig');
+    
+    navHome.addEventListener('click', ()=>{ setActive(navHome); updateView('homeView'); });
+    navCalendar.addEventListener('click', ()=>{ setActive(navCalendar); updateView('calendarView'); });
+    navConfig.addEventListener('click', ()=>{ setActive(navConfig); updateView('configView'); });
 
+    function setActive(el){ 
+        document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active')); 
+        el.classList.add('active'); 
+    }
+
+    // Initial check (starts Firebase)
     initFirebase();
 
     window.addEventListener('resize', updateMiniVisibility);

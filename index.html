@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Reading Tracker — 20:9 Optimized</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#2f2418;
+      --surface:#231a12;
+      --panel:#3b3026;
+      --muted:#b8a995;
+      --accent:#f6c9d2;
+      --accent-strong:#f5b7c6;
+      --white:#fff6f6;
+      --radius:14px;
+      --safe-bottom: env(safe-area-inset-bottom, 12px);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;background:var(--bg);color:var(--white);-webkit-font-smoothing:antialiased}
+    /* Make the app take full width on narrow tall phones (20:9) while keeping a pleasant max-width on wider screens */
+    .app{
+      width:100%;
+      max-width:420px; /* narrower than before to fit tall narrow phones */
+      margin:0 auto;
+      padding:14px 12px calc(120px + var(--safe-bottom));
+    }
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    header h1{font-size:20px;margin:0;font-weight:700}
+    header .sub{font-size:12px;color:var(--muted)}
+
+    /* Session list */
+    .list{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+    .session{display:flex;align-items:center;justify-content:space-between;padding:10px 10px;border-radius:12px;min-height:48px;transition:transform .18s ease;background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));color:var(--white);font-size:14px}
+    .session .left{display:flex;gap:10px;align-items:center}
+    .session .time-s{font-weight:700;font-size:15px}
+    .session .dur{font-size:13px;color:var(--muted)}
+    .session .actions{display:flex;gap:8px;align-items:center}
+    .btn{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:10px;color:var(--white);font-weight:600;font-size:13px}
+    .btn.danger{border-color:rgba(255,80,80,0.3);color:#ffb8b8}
+
+    .session.swiped{transform:translateX(-82px)}
+
+    /* Floating action button moved slightly higher so it doesn't clash with controls on tall phones */
+    .fab{position:fixed;right:14px;bottom:120px;background:var(--accent);color:#241916;padding:12px 18px;border-radius:28px;box-shadow:0 10px 30px rgba(0,0,0,0.35);display:flex;gap:8px;align-items:center;font-weight:700;border:0;z-index:40}
+    /* Slightly larger tap area */
+    .fab svg{width:18px;height:18px}
+
+    .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:96px;background:#1f1a17;padding:12px 16px;border-radius:12px;display:none;align-items:center;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,0.5);z-index:41}
+    .toast.show{display:flex}
+    .toast button{background:transparent;border:0;color:var(--accent);font-weight:700}
+
+    .month-title{font-size:18px;margin:6px 0 8px;display:flex;align-items:center;justify-content:space-between}
+    .month-title button{background:transparent;border:0;color:var(--muted);font-weight:700;padding:8px;border-radius:10px}
+    .weekdays{display:flex;gap:6px;color:var(--muted);margin-bottom:8px}
+    .weekdays div{flex:1;text-align:center;font-size:12px}
+    .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+    .circle-day{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.03);color:var(--muted);margin:auto;font-weight:700;position:relative;font-size:13px}
+    .circle-day.today{outline:3px solid rgba(245,183,198,0.18)}
+    .circle-day .badge{position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:10px;background:rgba(255,255,255,0.04);padding:2px 6px;border-radius:8px}
+    .month-block{margin-bottom:20px}
+    .month-label{font-size:18px;margin:6px 0;color:var(--white)}
+
+    .months-row{display:flex;gap:8px;overflow:auto;padding:8px 4px}
+    .month-box{min-width:86px;padding:10px;border-radius:12px;background:var(--panel);text-align:center}
+
+    .section{background:var(--panel);padding:12px;border-radius:12px;margin-top:12px}
+    .section h3{margin:0 0 10px 0;color:var(--white);font-size:15px}
+    .row{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:12px;background:rgba(255,255,255,0.02);margin-bottom:8px;font-size:14px}
+    .row .label{display:flex;gap:12px;align-items:center}
+    .row small{color:var(--muted)}
+
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+    .modal{background:var(--surface);padding:12px;border-radius:12px;max-width:420px;width:100%;max-height:80vh;overflow:auto}
+    .modal h4{margin:0 0 8px}
+    .modal .sess-row{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:10px;background:rgba(255,255,255,0.02);margin-bottom:8px}
+    .modal label{font-size:13px;color:var(--muted)}
+
+    /* bottom navigation made slightly taller with roomy touch targets */
+    .bottom-nav{position:fixed;left:0;right:0;bottom:0;height:76px;background:#3b2f24;display:flex;gap:8px;align-items:center;justify-content:space-around;padding:12px;border-top-left-radius:12px;border-top-right-radius:12px;z-index:39}
+    .nav-item{flex:1;text-align:center;color:var(--muted);font-weight:700;padding:8px;border-radius:12px}
+    .nav-item.active{background:#2a2118;padding:10px;border-radius:18px;color:var(--white)}
+
+    /* responsive tweaks */
+    @media (max-width:360px){
+      .app{padding:12px 10px calc(120px + var(--safe-bottom));}
+      .session{padding:10px}
+      header h1{font-size:18px}
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <header>
+      <div>
+        <h1 id="pageTitle">Home</h1>
+        <div class="sub" id="subTitle">Today</div>
+      </div>
+      <div class="sub" id="clock">--:--</div>
+    </header>
+
+    <!-- HOME -->
+    <main id="homeView">
+      <div class="list" id="sessionList"></div>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <div style="flex:1;background:rgba(255,255,255,0.02);padding:10px;border-radius:12px;text-align:center">Today<br><strong id="sumToday">0h 0m</strong></div>
+        <div style="flex:1;background:rgba(255,255,255,0.02);padding:10px;border-radius:12px;text-align:center">This Week<br><strong id="sumWeek">0h 0m</strong></div>
+        <div style="flex:1;background:rgba(255,255,255,0.02);padding:10px;border-radius:12px;text-align:center">Month<br><strong id="sumMonth">0h 0m</strong></div>
+      </div>
+    </main>
+
+    <!-- CALENDAR -->
+    <main id="calendarView" style="display:none">
+      <div class="month-block">
+        <div class="month-title"><button id="prevMonth">◀</button><div id="monthTitleText">Month</div><button id="nextMonth">▶</button></div>
+        <div class="weekdays"><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div><div>S</div></div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+      </div>
+      <div class="month-block" style="margin-top:6px">
+        <div class="month-label">Last 12 months</div>
+        <div class="months-row" id="monthsList"></div>
+      </div>
+    </main>
+
+    <!-- CONFIG -->
+    <main id="configView" style="display:none">
+      <div class="section">
+        <h3>Categories</h3>
+        <div id="categoriesList"></div>
+        <div style="text-align:center;margin:10px 0"><button id="addCategoryBtn" style="background:#71593f;color:var(--white);padding:10px 16px;border-radius:12px;border:0">+ add category</button></div>
+      </div>
+
+      <div class="section">
+        <h3>Storage</h3>
+        <div class="row"><div><strong>Backup</strong><br><small>Export a backup file of your sessions</small></div><div><button id="exportBtn">Export</button></div></div>
+        <div class="row"><div><strong>Import</strong><br><small>Load sessions from a backup JSON</small></div><div><input id="importFile" type="file" accept="application/json"></div></div>
+      </div>
+    </main>
+
+    <!-- Modal for day sessions -->
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal" role="dialog" aria-modal="true" id="modal">
+        <h4 id="modalTitle">Sessions</h4>
+        <div id="modalContent"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button class="btn" id="closeModal">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- undo toast -->
+    <div class="toast" id="toast"><div id="toastText">Deleted</div><button id="undoBtn">Undo</button></div>
+
+    <button class="fab" id="startBtn"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M5 3v18l15-9L5 3z"/></svg> Start</button>
+
+  </div>
+
+  <div class="bottom-nav">
+    <div class="nav-item active" id="navHome">Home</div>
+    <div class="nav-item" id="navCalendar">Calendar</div>
+    <div class="nav-item" id="navConfig">Configurations</div>
+  </div>
+
+  <!-- Reuse the exact same JS logic from the original file; compatible with responsive CSS above.
+       The script below is intentionally left unchanged except for the duplicate utility function names
+       being removed and comments cleaned so it remains a drop-in replacement. -->
+  <script>
+    /* --- Storage keys & helpers --- */
+    const STORAGE_KEY='reading_sessions_v1';
+    const CAT_KEY='reading_categories_v1';
+    function loadData(){ try{ const raw=localStorage.getItem(STORAGE_KEY); return raw?JSON.parse(raw):{} }catch(e){console.error(e);return{} } }
+    function saveData(d){ localStorage.setItem(STORAGE_KEY, JSON.stringify(d)) }
+    function loadCats(){ try{ const raw=localStorage.getItem(CAT_KEY); return raw?JSON.parse(raw):[] }catch(e){console.error(e);return[] } }
+    function saveCats(c){ localStorage.setItem(CAT_KEY, JSON.stringify(c)) }
+
+    /* --- Stopwatch & UI refs --- */
+    let running=false, startTs=null, timerId=null;
+    const startBtn=document.getElementById('startBtn');
+    const sessionList=document.getElementById('sessionList');
+    const sumTodayEl=document.getElementById('sumToday');
+    const sumWeekEl=document.getElementById('sumWeek');
+    const sumMonthEl=document.getElementById('sumMonth');
+    const calendarGrid=document.getElementById('calendarGrid');
+    const monthTitleText=document.getElementById('monthTitleText');
+    const monthsList=document.getElementById('monthsList');
+    const categoriesList=document.getElementById('categoriesList');
+    let lastDeleted = null;
+    const toast=document.getElementById('toast'); const toastText=document.getElementById('toastText'); const undoBtn=document.getElementById('undoBtn');
+    let toastTimer=null;
+
+    function pad(n){ return String(n).padStart(2,'0') }
+    function secsToHMS(total){ total=Math.floor(total); const h=Math.floor(total/3600); const m=Math.floor((total%3600)/60); const s=total%60; return `${pad(h)}:${pad(m)}:${pad(s)}` }
+    function shortHours(total){ if(!total) return '0h 0m'; const h=Math.floor(total/3600); const m=Math.floor((total%3600)/60); return `${h}h ${m}m` }
+
+    function fmtTime(iso){ const d=new Date(iso); return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+
+    function saveSession(start, end){ const data=loadData(); const startDate=new Date(start); const key=startDate.toISOString().slice(0,10); if(!data[key]) data[key]=[]; const secs=Math.floor((new Date(end)-new Date(start))/1000); data[key].push({start:new Date(start).toISOString(), end:new Date(end).toISOString(), secs}); saveData(data); renderHome(); renderCalendar(currentYear,currentMonth); renderMonths(); }
+
+    startBtn.addEventListener('click', ()=>{
+      if(!running){ running=true; startTs=Date.now(); startBtn.textContent='Stop'; startBtn.style.background='#eb9aa7'; timerId=setInterval(()=>{ updateFab(); renderRunningSession(); },300); }
+      else { running=false; clearInterval(timerId); startBtn.textContent='Start'; startBtn.style.background='var(--accent)'; const end=Date.now(); saveSession(startTs, end); startTs=null; updateFab(); }
+    });
+    function updateFab(){ if(running && startTs){ const secs=Math.floor((Date.now()-startTs)/1000); startBtn.innerHTML=`<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M10 8h4v8h-4z"/></svg> ${secsToHMS(secs)}` } else { startBtn.innerHTML=`<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M5 3v18l15-9L5 3z"/></svg> Start` } }
+
+    function renderRunningSession(){ if(!running || !startTs) return; const todayKey=new Date().toISOString().slice(0,10); const secs=Math.floor((Date.now()-startTs)/1000); const virtual={start:new Date(startTs).toISOString(), end:new Date().toISOString(), secs}; const top = document.querySelector('.session.virtual'); if(top){ const span = top.querySelector('.time-s'); span.textContent = fmtTime(virtual.start); const dur = top.querySelector('.dur'); dur.textContent = `── ${Math.round(virtual.secs/60)} min ──`; const right = top.querySelector('.right'); right.textContent = fmtTime(virtual.end); } }
+
+    function renderHome(){ const data=loadData(); const todayKey=new Date().toISOString().slice(0,10); const arr=data[todayKey]||[]; sessionList.innerHTML='';
+      if(running && startTs){ const virtual=document.createElement('div'); virtual.className='session virtual'; virtual.innerHTML=`<div class="left"><div class="time-s">${fmtTime(new Date(startTs).toISOString())}</div><div class="dur">── 0 min ──</div></div><div class="actions"></div><div class="right">${fmtTime(new Date().toISOString())}</div>`; sessionList.appendChild(virtual); attachSwipeHandlers(virtual, null, null); }
+      arr.slice().reverse().forEach((s,idx)=>{
+        const el=document.createElement('div'); el.className='session';
+        el.dataset.index = arr.length-1-idx; el.dataset.date = todayKey;
+        el.innerHTML = `<div class="left"><div class="time-s">${fmtTime(s.start)}</div><div class="dur">── ${Math.round(s.secs/60)} min ──</div></div><div class="actions"></div><div class="right">${fmtTime(s.end)}</div>`;
+        const actions = el.querySelector('.actions');
+        const delBtn=document.createElement('button'); delBtn.className='btn danger'; delBtn.textContent='Delete'; delBtn.addEventListener('click', ()=>{ if(confirm('Delete this session?')){ deleteSession(todayKey, parseInt(el.dataset.index)); } });
+        actions.appendChild(delBtn);
+        sessionList.appendChild(el);
+        attachSwipeHandlers(el, todayKey, parseInt(el.dataset.index));
+      });
+      const todaySecs=(data[todayKey]||[]).reduce((a,b)=>a+b.secs,0); sumTodayEl.textContent = shortHours(todaySecs);
+      const startW = startOfWeek(new Date()); let weekSecs=0; for(let i=0;i<7;i++){ const d=new Date(startW); d.setDate(startW.getDate()+i); const key=d.toISOString().slice(0,10); (data[key]||[]).forEach(s=>weekSecs+=s.secs); } sumWeekEl.textContent = shortHours(weekSecs);
+      const now=new Date(); const y=now.getFullYear(), m=now.getMonth(); let monthSecs=0; const mdays=new Date(y,m+1,0).getDate(); for(let d=1; d<=mdays; d++) monthSecs+= sumSecondsForDate(data,y,m,d); sumMonthEl.textContent = shortHours(monthSecs);
+    }
+
+    function attachSwipeHandlers(el, dateKey, index){ let startX=0, startY=0, moved=false; el.addEventListener('touchstart', (e)=>{ startX=e.touches[0].clientX; startY=e.touches[0].clientY; moved=false; }, {passive:true});
+      el.addEventListener('touchmove', (e)=>{ const dx=e.touches[0].clientX - startX; const dy=e.touches[0].clientY - startY; if(Math.abs(dy)>30) return; if(dx<0){ moved=true; el.style.transform = `translateX(${dx}px)`; } }, {passive:true});
+      el.addEventListener('touchend', (e)=>{ if(!moved) { el.style.transform=''; return } const dxEnd = parseFloat((el.style.transform||'translateX(0px)').replace(/translateX\(|px\)/g,'')) || 0; if(dxEnd < -70){ if(dateKey!==null && index!==null){ const data=loadData(); const sess = JSON.parse(JSON.stringify(data[dateKey][index])); deleteSessionWithUndo(dateKey, index, sess); } else { if(running){ startBtn.click(); } } } el.style.transform=''; }, {passive:true});
+      let isDown=false; let mouseStartX=0; el.addEventListener('mousedown',(e)=>{ isDown=true; mouseStartX=e.clientX; }); window.addEventListener('mousemove',(e)=>{ if(!isDown) return; const dx=e.clientX - mouseStartX; if(dx<0) el.style.transform=`translateX(${dx}px)`; }); window.addEventListener('mouseup',(e)=>{ if(!isDown) return; isDown=false; const t = el.style.transform || ''; const dx = parseFloat(t.replace(/translateX\(|px\)/g,''))||0; if(dx < -70){ if(dateKey!==null && index!==null){ const data=loadData(); const sess = JSON.parse(JSON.stringify(data[dateKey][index])); deleteSessionWithUndo(dateKey,index,sess); } else { if(running) startBtn.click(); } } el.style.transform=''; }); }
+
+    function deleteSessionWithUndo(dateKey, index, sess){ const data=loadData(); if(!data[dateKey]) return; lastDeleted = {dateKey, sess, index}; data[dateKey].splice(index,1); if(data[dateKey].length===0) delete data[dateKey]; saveData(data); renderHome(); renderCalendar(currentYear,currentMonth); renderMonths(); showToast('Deleted', true); }
+    undoBtn.addEventListener('click', ()=>{ if(!lastDeleted) return; const data=loadData(); const {dateKey,sess,index}=lastDeleted; if(!data[dateKey]) data[dateKey]=[]; data[dateKey].splice(index,0,sess); saveData(data); renderHome(); renderCalendar(currentYear,currentMonth); renderMonths(); lastDeleted=null; hideToast(); });
+    function showToast(text, showUndo=false){ toastText.textContent = text; toast.classList.add('show'); if(toastTimer) clearTimeout(toastTimer); toastTimer = setTimeout(()=>{ hideToast(); lastDeleted=null; }, 5000); }
+    function hideToast(){ toast.classList.remove('show'); if(toastTimer) clearTimeout(toastTimer); toastTimer=null; }
+
+    function deleteSession(dateKey, index){ const data=loadData(); if(!data[dateKey]||!data[dateKey][index]) return; data[dateKey].splice(index,1); if(data[dateKey].length===0) delete data[dateKey]; saveData(data); renderHome(); renderCalendar(currentYear,currentMonth); renderMonths(); }
+
+    const modalOverlay=document.getElementById('modalOverlay'); const modalContent=document.getElementById('modalContent'); const modalTitle=document.getElementById('modalTitle'); document.getElementById('closeModal').addEventListener('click', closeModal);
+    function openModalForDate(dateKey){ const data=loadData(); const arr=data[dateKey]||[]; modalTitle.textContent = `Sessions — ${dateKey}`; modalContent.innerHTML='';
+      if(arr.length===0){ modalContent.innerHTML='<div class="muted center">No sessions for this day</div>'; }
+      arr.forEach((s,idx)=>{
+        const row=document.createElement('div'); row.className='sess-row';
+        const left=document.createElement('div'); left.innerHTML = `<div style="font-weight:700">${fmtTime(s.start)} → ${fmtTime(s.end)}</div><div style="font-size:13px;color:var(--muted)">${Math.round(s.secs/60)} min</div>`;
+        const right=document.createElement('div'); right.style.display='flex'; right.style.gap='8px';
+        const edit=document.createElement('button'); edit.className='btn'; edit.textContent='Edit'; edit.addEventListener('click', ()=>{ openEditDialog(dateKey, idx); });
+        const del=document.createElement('button'); del.className='btn danger'; del.textContent='Delete'; del.addEventListener('click', ()=>{ if(confirm('Delete this session?')){ deleteSession(dateKey, idx); closeModal(); } });
+        right.appendChild(edit); right.appendChild(del);
+        row.appendChild(left); row.appendChild(right); modalContent.appendChild(row);
+      });
+      modalOverlay.style.display='flex';
+    }
+    function closeModal(){ modalOverlay.style.display='none'; }
+
+    function openEditDialog(dateKey, index){ const data=loadData(); const sess = (data[dateKey]||[])[index]; if(!sess){ alert('Session not found'); return; }
+      const startDT = new Date(sess.start); const endDT = new Date(sess.end);
+      const startStr = startDT.toTimeString().slice(0,5); const endStr = endDT.toTimeString().slice(0,5);
+      const newStart = prompt('Edit start time (HH:MM)', startStr); if(newStart===null) return; const newEnd = prompt('Edit end time (HH:MM)', endStr); if(newEnd===null) return;
+      const [sh,sm] = newStart.split(':').map(x=>parseInt(x,10)); const [eh,em] = newEnd.split(':').map(x=>parseInt(x,10)); if(isNaN(sh)||isNaN(sm)||isNaN(eh)||isNaN(em)){ alert('Invalid time format'); return; }
+      const y = parseInt(dateKey.slice(0,4),10); const mo = parseInt(dateKey.slice(5,7),10)-1; const d = parseInt(dateKey.slice(8,10),10);
+      const newStartIso = new Date(y,mo,d,sh,sm).toISOString(); const newEndIso = new Date(y,mo,d,eh,em).toISOString(); const newSecs = Math.max(0, Math.floor((new Date(newEndIso)-new Date(newStartIso))/1000));
+      data[dateKey][index] = {start:newStartIso, end:newEndIso, secs:newSecs}; saveData(data); renderHome(); renderCalendar(currentYear,currentMonth); renderMonths(); alert('Saved');
+    }
+
+    let currentYear=(new Date()).getFullYear(), currentMonth=(new Date()).getMonth();
+    function startOfWeek(d){ const dd=new Date(d); const day=dd.getDay(); const diff = dd.getDate() - day + (day===0?-6:1); dd.setDate(diff); dd.setHours(0,0,0,0); return dd }
+    function sumSecondsForDate(data,y,m,d){ const key = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; const arr = data[key]||[]; return arr.reduce((s,sess)=>s + (sess.secs||0),0) }
+    function renderCalendar(year, month){ calendarGrid.innerHTML=''; monthTitleText.textContent = new Date(year,month,1).toLocaleString(undefined,{month:'long',year:'numeric'});
+      const first=new Date(year,month,1); const leading=(first.getDay()+6)%7; const daysInMonth=new Date(year,month+1,0).getDate(); const total=leading+daysInMonth; const rows=Math.ceil(total/7);
+      const data=loadData(); for(let i=0;i<leading;i++){ const c=document.createElement('div'); calendarGrid.appendChild(c); }
+      for(let d=1; d<=daysInMonth; d++){ const c=document.createElement('div'); const circle=document.createElement('div'); circle.className='circle-day'; circle.textContent=d; const secs = sumSecondsForDate(data,year,month,d); if(secs>0){ const badge=document.createElement('div'); badge.className='badge'; badge.textContent = `${Math.floor(secs/3600)}h ${Math.floor((secs%3600)/60)}m`; circle.appendChild(badge); circle.style.background='rgba(245,183,198,0.08)'; }
+        const cellDateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; const todayStr = new Date().toISOString().slice(0,10); if(cellDateStr===todayStr) circle.classList.add('today'); circle.addEventListener('click', ()=>{ openModalForDate(cellDateStr); }); c.appendChild(circle); calendarGrid.appendChild(c); }
+      const trailing = rows*7 - total; for(let j=0;j<trailing;j++){ const c=document.createElement('div'); calendarGrid.appendChild(c); }
+    }
+
+    document.getElementById('prevMonth').addEventListener('click', ()=>{ currentMonth--; if(currentMonth<0){ currentMonth=11; currentYear--; } renderCalendar(currentYear,currentMonth); });
+    document.getElementById('nextMonth').addEventListener('click', ()=>{ currentMonth++; if(currentMonth>11){ currentMonth=0; currentYear++; } renderCalendar(currentYear,currentMonth); });
+
+    function renderMonths(){ monthsList.innerHTML=''; const data=loadData(); for(let i=11;i>=0;i--){ const dt=new Date(); dt.setMonth(dt.getMonth()-i); const y=dt.getFullYear(), m=dt.getMonth(); let msecs=0; const mdays=new Date(y,m+1,0).getDate(); for(let d=1; d<=mdays; d++) msecs += sumSecondsForDate(data,y,m,d); const box=document.createElement('div'); box.className='month-box'; box.innerHTML=`<div style="font-size:12px">${dt.toLocaleString(undefined,{month:'short',year:'numeric'})}</div><div style="font-weight:700;margin-top:6px">${shortHours(msecs)}</div>`; monthsList.appendChild(box); } }
+
+    function renderCategories(){ const cats=loadCats(); categoriesList.innerHTML=''; if(cats.length===0) categoriesList.innerHTML='<div class="row"><div class="label"><div style="opacity:0.6">No categories</div></div></div>'; else{ cats.forEach((c,idx)=>{ const r=document.createElement('div'); r.className='row'; r.innerHTML = `<div class="label">${c}</div>`; const del=document.createElement('button'); del.className='btn danger'; del.textContent='Delete'; del.addEventListener('click', ()=>{ if(confirm('Delete category?')){ const cs=loadCats(); cs.splice(idx,1); saveCats(cs); renderCategories(); } }); r.appendChild(del); categoriesList.appendChild(r); }) } }
+    document.getElementById('addCategoryBtn').addEventListener('click', ()=>{ const name = prompt('Category name'); if(!name) return; const cats=loadCats(); if(cats.includes(name)){ alert('Category already exists'); return; } cats.push(name); saveCats(cats); renderCategories(); alert('Category added'); });
+
+    const navHome=document.getElementById('navHome'), navCalendar=document.getElementById('navCalendar'), navConfig=document.getElementById('navConfig'); const homeView=document.getElementById('homeView'), calendarView=document.getElementById('calendarView'), configView=document.getElementById('configView');
+    function setActive(el){ document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active')); el.classList.add('active'); }
+    navHome.addEventListener('click', ()=>{ setActive(navHome); homeView.style.display='block'; calendarView.style.display='none'; configView.style.display='none'; document.getElementById('pageTitle').textContent='Home'; });
+    navCalendar.addEventListener('click', ()=>{ setActive(navCalendar); homeView.style.display='none'; calendarView.style.display='block'; configView.style.display='none'; document.getElementById('pageTitle').textContent='Calendar'; renderCalendar(currentYear,currentMonth); renderMonths(); });
+    navConfig.addEventListener('click', ()=>{ setActive(navConfig); homeView.style.display='none'; calendarView.style.display='none'; configView.style.display='block'; document.getElementById('pageTitle').textContent='Configurations'; renderCategories(); });
+
+    document.getElementById('exportBtn').addEventListener('click', ()=>{ const data=loadData(); const blob=new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='reading_sessions.json'; a.click(); URL.revokeObjectURL(url); });
+    document.getElementById('importFile').addEventListener('change', (e)=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=function(){ try{ const parsed=JSON.parse(r.result); saveData(parsed); renderHome(); renderCalendar(currentYear,currentMonth); renderMonths(); alert('Import successful'); }catch(err){ alert('Invalid JSON'); } }; r.readAsText(f); });
+
+    renderHome(); renderCalendar(currentYear,currentMonth); renderMonths(); renderCategories();
+    setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }, 1000);
+    document.addEventListener('keydown', (e)=>{ if(e.key===' ') { e.preventDefault(); startBtn.click(); } });
+  </script>
+</body>
+</html>

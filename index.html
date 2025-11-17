@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Reading Tracker (Firebase Online)</title>
+  <title>Reading Tracker (Offline Timer)</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
   <style>
     :root{
@@ -172,18 +172,17 @@
 
   <script type="module">
     // --- FIREBASE CONFIGURATION AND INITIALIZATION ---
-    // 1. Import necessary functions
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, addDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, orderBy, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, addDoc, deleteDoc, onSnapshot, collection, query, writeBatch, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // 2. PASTE YOUR CONFIG HERE (<<< YOU MUST REPLACE THESE PLACEHOLDERS)
+    // PASTE YOUR CONFIG HERE (MUST BE UPDATED)
     const firebaseConfig = {
       apiKey: "AIzaSyAeTzfg4WhmuGrGwHVShDJ_oNHYW8EgBZw", 
-      authDomain: "time-tracker-ff.firebaseapp.com", 
+      authDomain: "time-tracker-ff.firebaseapp.com",
       projectId: "time-tracker-ff", 
-      storageBucket: "time-tracker-ff.firebasestorage.app", 
-      messagingSenderId: "516931076456", 
+      storageBucket: "time-tracker-ff.firebasestorage.app",
+      messagingSenderId: "516931076456",
       appId: "1:516931076456:web:dac05b772bcfc02bff16dd"
     };
 
@@ -194,48 +193,65 @@
     let isAuthReady = false;
     let sessionsCache = {}; // Local cache of all sessions
 
-    // Initialize Firebase and Authenticate Anonymously
+    // Firestore Path Helpers
+    const getSessionsPath = () => `users/${userId}/sessions`;
+    // New path for the persistent running timer state
+    const getRunningStateDocRef = () => doc(db, `users/${userId}/state/runningTimer`);
+
     async function initFirebase() {
         try {
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
 
-            // Sign in anonymously to get a unique user ID
             await signInAnonymously(auth);
 
-            onAuthStateChanged(auth, (user) => {
+            onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     userId = user.uid;
-                    console.log("Firebase initialized. User ID:", userId);
                     isAuthReady = true;
+
+                    // CHECK FOR OFFLINE RUNNING SESSION
+                    const stateDoc = await getDoc(getRunningStateDocRef());
+                    if (stateDoc.exists() && stateDoc.data().isRunning) {
+                        const state = stateDoc.data();
+                        // Set the application state based on the saved data
+                        running = true;
+                        startTs = state.startTs;
+                        
+                        // Update the FAB immediately and restart the display timer
+                        updateFab(); 
+                        timerId = setInterval(()=>{ updateFab(); renderRunningSession(); }, 300);
+                        
+                        // Update UI elements for running state
+                        startBtn.textContent = 'Stop'; 
+                        startBtn.style.background = 'var(--accent)'; 
+                        startBtn.style.color = 'var(--accent-text)'; 
+                        miniToday.classList.add('running');
+                    }
+
                     // Start rendering and listening for data only after auth is ready
                     renderHome();
                     renderCalendar(currentYear, currentMonth);
                     renderMonths();
                     setupRealtimeListener();
+
                 } else {
                     console.log("No user signed in.");
                 }
             });
         } catch (error) {
             console.error("Firebase Initialization Error:", error);
-            // Show a user-friendly error message on the screen
             document.getElementById('sessionList').innerHTML = `<div style="color:red;padding:20px;text-align:center;">
                 Error loading data. Check console for Firebase setup issues.
-                Did you replace 'YOUR_API_KEY' with your actual Firebase config?
             </div>`;
         }
     }
     
-    // Firestore Path Helpers
-    const getSessionsPath = () => `users/${userId}/sessions`;
-
-    // --- REAL-TIME DATA LISTENER (Replaces LoadData/SaveData) ---
+    // --- REAL-TIME DATA LISTENER ---
     function setupRealtimeListener() {
         if (!db || !userId) return;
 
-        // Query sessions, ordered by start time descending (most recent first)
         const q = query(collection(db, getSessionsPath()), orderBy("start", "desc"));
 
         onSnapshot(q, (snapshot) => {
@@ -264,7 +280,7 @@
         return sessionsCache[dateKey] || [];
     }
 
-    // --- APPLICATION LOGIC (Updated to use Firebase) ---
+    // --- APPLICATION LOGIC ---
     let running=false, startTs=null, timerId=null;
     const startBtn=document.getElementById('startBtn');
     const miniToday=document.getElementById('miniToday');
@@ -285,10 +301,11 @@
     function shortHours(total){ if(!total) return '0h 0m'; const h=Math.floor(total/3600); const m=Math.floor((total%3600)/60); return `${h}h ${m}m` }
     function fmtTime(iso){ const d=new Date(iso); return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
 
-    // Replaced saveSession with Firebase logic
+    // Saves the completed session
     async function saveSession(start, end){ 
         if (!db || !userId) return;
         const startDate=new Date(start);
+        // Duration calculation MUST use the saved startTs and the current end time (Date.now())
         const secs=Math.floor((new Date(end)-new Date(start))/1000); 
 
         const sessionData = {
@@ -308,27 +325,69 @@
         }
     }
 
-    startBtn.addEventListener('click', ()=>{
+    // Saves the running state to Firestore for persistence
+    async function saveRunningState(startTs) {
+        if (!db || !userId) return;
+        try {
+            // Use writeBatch to ensure state update and session save are atomic, though for start it's simple
+            const batch = writeBatch(db);
+            batch.set(getRunningStateDocRef(), { isRunning: true, startTs: startTs });
+            await batch.commit();
+        } catch (e) {
+            console.error("Error saving running state:", e);
+            alert("Error saving running state. Check console.");
+        }
+    }
+
+    // Deletes the running state from Firestore
+    async function deleteRunningState() {
+        if (!db || !userId) return;
+        try {
+            await deleteDoc(getRunningStateDocRef());
+        } catch (e) {
+            console.error("Error deleting running state:", e);
+            // Non-critical, just log
+        }
+    }
+
+    startBtn.addEventListener('click', async ()=>{
       if(!running){ 
-          running=true; 
-          startTs=Date.now(); 
-          startBtn.textContent='Stop'; 
-          startBtn.style.background='var(--accent)'; 
-          startBtn.style.color='var(--accent-text)'; 
+          // --- START TIMER ---
+          const now = Date.now();
+          running = true; 
+          startTs = now; 
+          
+          await saveRunningState(now); // Save persistent state
+
+          startBtn.textContent = 'Stop'; 
+          startBtn.style.background = 'var(--accent)'; 
+          startBtn.style.color = 'var(--accent-text)'; 
           miniToday.classList.add('running'); 
-          timerId=setInterval(()=>{ updateFab(); renderRunningSession(); },300); 
+          
+          timerId = setInterval(()=>{ updateFab(); renderRunningSession(); }, 300); 
       }
       else { 
-          running=false; 
+          // --- STOP TIMER ---
+          const end = Date.now();
+          // The duration calculation uses the persistent startTs
+          
+          // Clear app state
+          running = false; 
           clearInterval(timerId); 
-          startBtn.textContent='Start'; 
-          startBtn.style.background='var(--accent)'; 
-          startBtn.style.color='var(--accent-text)'; 
-          miniToday.classList.remove('running'); 
-          const end=Date.now(); 
-          saveSession(startTs, end); 
-          startTs=null; 
-          updateFab(); 
+          timerId = null;
+
+          await deleteRunningState(); // Clear persistent state
+
+          // Save the final session using the persistent startTs
+          await saveSession(startTs, end); 
+          
+          // Reset UI
+          startTs = null;
+          startBtn.textContent = 'Start'; 
+          startBtn.style.background = 'var(--accent)'; 
+          startBtn.style.color = 'var(--accent-text)'; 
+          miniToday.classList.remove('running');
+          updateFab(); // Rerender totals
       }
     });
 
@@ -336,6 +395,7 @@
         const todayKey = new Date().toISOString().slice(0, 10);
         let totalSecs = (sessionsCache[todayKey] || []).reduce((a, b) => a + b.secs, 0);
         if (isRunning && startTimestamp) {
+            // This is the core logic: calculate time since the persistent startTs
             totalSecs += Math.floor((Date.now() - startTimestamp) / 1000);
         }
         return totalSecs;
@@ -360,18 +420,37 @@
       }
     }
 
-    function renderRunningSession(){ if(!running || !startTs) return; const todayKey=new Date().toISOString().slice(0,10); const secs=Math.floor((Date.now()-startTs)/1000); const virtual={start:new Date(startTs).toISOString(), end:new Date().toISOString(), secs}; const top = document.querySelector('.session.virtual'); if(top){ const span = top.querySelector('.time-s'); span.textContent = fmtTime(virtual.start); const dur = top.querySelector('.dur'); dur.textContent = `── ${Math.round(virtual.secs/60)} min ──`; const right = top.querySelector('.right'); right.textContent = fmtTime(virtual.end); } }
+    function renderRunningSession(){ 
+        if(!running || !startTs) return; 
+        
+        const secs=Math.floor((Date.now()-startTs)/1000); // Uses persistent startTs
+        const virtual={
+            start: new Date(startTs).toISOString(), // Use persistent startTs
+            end: new Date().toISOString(), 
+            secs: secs
+        }; 
+        
+        const top = document.querySelector('.session.virtual'); 
+        if(top){ 
+            const span = top.querySelector('.time-s'); 
+            span.textContent = fmtTime(virtual.start); 
+            const dur = top.querySelector('.dur'); 
+            dur.textContent = `── ${Math.round(virtual.secs/60)} min ──`; 
+            const right = top.querySelector('.right'); 
+            right.textContent = fmtTime(virtual.end); 
+        } 
+    }
 
     function renderHome(){ 
-      if (!isAuthReady) return;
+      if (!isAuthReady) return; 
 
       const todayKey=new Date().toISOString().slice(0,10); 
-      // The onSnapshot listener handles sorting, so we can just reverse the cached data for display
-      const arr = getSessionsByDate(todayKey).slice().sort((a, b) => new Date(b.start) - new Date(a.start)); 
+      const arr = getSessionsByDate(todayKey).sort((a, b) => new Date(b.start) - new Date(a.start));
 
       sessionList.innerHTML='';
 
       if(running && startTs){ 
+        // This is where the virtual running session is added
         const virtual=document.createElement('div'); 
         virtual.className='session virtual'; 
         virtual.innerHTML=`<div class="left"><div class="time-s">${fmtTime(new Date(startTs).toISOString())}</div><div class="dur">── 0 min ──</div></div><div class="actions"></div><div class="right">${fmtTime(new Date().toISOString())}</div>`; 
@@ -379,14 +458,14 @@
         attachSwipeHandlers(virtual, null, null); 
       }
 
-      arr.forEach((s,idx)=>{
+      arr.forEach((s)=>{
         const el=document.createElement('div'); 
         el.className='session';
-        el.dataset.id = s.id; // Use Firestore ID for swipe deletion
+        el.dataset.id = s.id; 
         el.dataset.date = todayKey;
         el.innerHTML = `<div class="left"><div class="time-s">${fmtTime(s.start)}</div><div class="dur">── ${Math.round(s.secs/60)} min ──</div></div><div class="actions"></div><div class="right">${fmtTime(s.end)}</div>`;
         sessionList.appendChild(el);
-        attachSwipeHandlers(el, todayKey, s.id); // Pass Firestore ID to swipe handler
+        attachSwipeHandlers(el, todayKey, s.id);
       });
 
       // Calculate Summary Totals from Cache
@@ -405,7 +484,6 @@
       const now=new Date(); 
       const y=now.getFullYear(), m=now.getMonth(); 
       let monthSecs=0; 
-      // Aggregate data for the current month summary
       Object.keys(sessionsCache).forEach(key => {
           const date = new Date(key);
           if (date.getFullYear() === y && date.getMonth() === m) {
@@ -445,17 +523,15 @@
             
             if(dxEnd < -70){ 
                 if(docId){
-                    // For saved sessions (docId is the Firestore ID)
                     deleteSessionWithUndo(docId);
                 } else if(running) { 
-                    // For the virtual running session
+                    // Swipe left on the virtual running session acts as Stop
                     startBtn.click(); 
                 } 
             } 
             el.style.transform=''; 
         }, {passive:true});
         
-        // Desktop mouse events (simplified from original)
         let isDown=false; 
         let mouseStartX=0; 
         el.addEventListener('mousedown',(e)=>{ isDown=true; mouseStartX=e.clientX; }); 
@@ -480,11 +556,9 @@
         }); 
     }
 
-    // Replaced deleteSessionWithUndo to use Firebase
     async function deleteSessionWithUndo(docId){ 
         if (!db || !userId || !docId) return;
 
-        // Find the session in the cache to store for undo
         let sessionToUndo = null;
         for (const dateKey in sessionsCache) {
             sessionToUndo = sessionsCache[dateKey].find(s => s.id === docId);
@@ -500,7 +574,6 @@
 
         try {
             await deleteDoc(doc(db, getSessionsPath(), docId));
-            // UI update handled by onSnapshot
             showToast('Deleted', true);
         } catch (e) {
             console.error("Error deleting document: ", e);
@@ -513,21 +586,18 @@
         
         const { docId, sess } = lastDeleted;
         
-        // Recreate the document data, excluding the Firestore ID
         const sessionData = { 
             start: sess.start,
             end: sess.end,
             dateKey: sess.dateKey,
             secs: sess.secs,
-            timestamp: Date.now()
+            timestamp: sess.timestamp
         };
 
         try {
-            // Note: We use addDoc here because the original docId no longer exists.
             await addDoc(collection(db, getSessionsPath()), sessionData);
             lastDeleted=null; 
             hideToast();
-            // UI update handled by onSnapshot
         } catch (e) {
             console.error("Error undoing deletion:", e);
             alert("Error undoing deletion. Check console.");
@@ -543,7 +613,6 @@ function openModalForDate(dateKey){
   const arr = getSessionsByDate(dateKey);
   const total = arr.reduce((a,b)=>a + (b.secs||0),0);
   
-  // Only show total hours and minutes
   modalTitle.textContent = "Total Time on " + dateKey;
   const h = Math.floor(total/3600);
   const m = Math.floor((total%3600)/60);
@@ -558,12 +627,8 @@ function openModalForDate(dateKey){
 
     function closeModal(){ modalOverlay.style.display='none'; }
 
-    // Removed openEditDialog functionality
-
     let currentYear=(new Date()).getFullYear(), currentMonth=(new Date()).getMonth();
     function startOfWeek(d){ const dd=new Date(d); const day=dd.getDay(); const diff = dd.getDate() - day + (day===0?-6:1); dd.setDate(diff); dd.setHours(0,0,0,0); return dd }
-
-    // SumSecondsForDate now uses sessionsCache
     function sumSecondsForDate(y,m,d){ 
         const key = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; 
         const arr = sessionsCache[key]||[]; 
@@ -571,7 +636,7 @@ function openModalForDate(dateKey){
     }
 
     function renderCalendar(year, month){ 
-      if (!isAuthReady) return; // Wait for Firebase
+      if (!isAuthReady) return; 
       calendarGrid.innerHTML=''; 
       monthTitleText.textContent = new Date(year,month,1).toLocaleString(undefined,{month:'long',year:'numeric'});
       const first=new Date(year,month,1); const leading=(first.getDay()+6)%7; const daysInMonth=new Date(year,month+1,0).getDate(); const total=leading+daysInMonth; const rows=Math.ceil(total/7);
@@ -584,7 +649,6 @@ function openModalForDate(dateKey){
         circle.textContent=d;
         const cellDateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         
-        // Check cache for session presence
         if((sessionsCache[cellDateStr] || []).length > 0) circle.classList.add('has-session');
         
         const todayStr = new Date().toISOString().slice(0,10); 
@@ -615,7 +679,7 @@ function openModalForDate(dateKey){
     document.getElementById('nextMonth').addEventListener('click', ()=>{ currentMonth++; if(currentMonth>11){ currentMonth=0; currentYear++; } renderCalendar(currentYear,currentMonth); updateMiniVisibility(); });
 
     function renderMonths(){ 
-        if (!isAuthReady) return; // Wait for Firebase
+        if (!isAuthReady) return; 
         monthsList.innerHTML=''; 
         const now = new Date();
         for(let i=0;i<=11;i++){ 
@@ -623,7 +687,6 @@ function openModalForDate(dateKey){
             const y=dt.getFullYear(), m=dt.getMonth(); 
             let msecs=0; 
             
-            // Aggregate month's data from cache
             Object.keys(sessionsCache).forEach(key => {
                 const date = new Date(key);
                 if (date.getFullYear() === y && date.getMonth() === m) {
@@ -634,14 +697,13 @@ function openModalForDate(dateKey){
             const box=document.createElement('div'); 
             box.className='month-box'; 
             box.innerHTML=`<div style="font-size:12px">${dt.toLocaleString(undefined,{month:'short',year:'numeric'})}</div><div style="font-weight:700;margin-top:6px">${shortHours(msecs)}</div>`; 
-            monthsList.prepend(box); // Use prepend to show latest month first
+            monthsList.prepend(box); 
         } 
         updateMiniVisibility(); 
     }
 
-    // Modified export function to use Firestore data
     document.getElementById('exportBtn').addEventListener('click', ()=>{ 
-        const data = sessionsCache; // Export the entire cache structure
+        const data = sessionsCache; 
         const blob=new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}); 
         const url=URL.createObjectURL(blob); 
         const a=document.createElement('a'); 
@@ -651,7 +713,6 @@ function openModalForDate(dateKey){
         URL.revokeObjectURL(url); 
     });
 
-    // Modified import function to use Firestore batch writes
     document.getElementById('importFile').addEventListener('change', (e)=>{ 
         if (!db || !userId) {
              alert('Firebase not ready. Please try again.');
@@ -669,10 +730,8 @@ function openModalForDate(dateKey){
 
                 let count = 0;
                 
-                // Imported data is expected to be { dateKey: [{ session data }] }
                 for (const dateKey in importedData) {
                     importedData[dateKey].forEach(session => {
-                        // Ensure required fields are present and add Firestore-specific fields
                         const sessionData = {
                             start: session.start,
                             end: session.end,
@@ -688,7 +747,7 @@ function openModalForDate(dateKey){
                 
                 await batch.commit();
                 alert(`Import successful! ${count} sessions added.`);
-                e.target.value = null; // Clear input
+                e.target.value = null; 
             }catch(err){ 
                 console.error("Import Error:", err);
                 alert('Invalid JSON file or import error. Check console.'); 
@@ -704,7 +763,6 @@ function openModalForDate(dateKey){
     navCalendar.addEventListener('click', ()=>{ setActive(navCalendar); homeView.style.display='none'; calendarView.style.display='block'; configView.style.display='none'; document.getElementById('pageTitle').textContent='Calendar'; renderCalendar(currentYear,currentMonth); renderMonths(); updateMiniVisibility(); });
     navConfig.addEventListener('click', ()=>{ setActive(navConfig); homeView.style.display='none'; calendarView.style.display='none'; configView.style.display='block'; document.getElementById('pageTitle').textContent='Configurations'; updateMiniVisibility(); });
 
-    // Initial load will wait for Firebase auth to complete
     initFirebase();
 
     window.addEventListener('resize', updateMiniVisibility);
@@ -713,3 +771,4 @@ function openModalForDate(dateKey){
   </script>
 </body>
 </html>
+

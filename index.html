@@ -806,9 +806,10 @@ function openModalForDate(dateKey){
         const cellDateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         
         if((sessionsCache[cellDateStr] || []).length > 0) circle.classList.add('has-session');
-        
-        const todayStr = new Date().toISOString().slice(0,10); 
+       // Use the function that respects the device's current date/time
+        const todayStr = getLocalDateKey(); 
         if(cellDateStr===todayStr) circle.classList.add('today');
+        
         
         circle.addEventListener('click', ()=>{ openModalForDate(cellDateStr); });
         c.appendChild(circle); calendarGrid.appendChild(c); 

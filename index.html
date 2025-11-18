@@ -245,7 +245,8 @@
     let isAuthReady = false;
     let sessionsCache = {};
     let unsubscribeSessions = null; 
-
+    let unsubscribeRunningState = null;
+    
     // DOM References for Auth
     const authControls = document.getElementById('authControls');
     const authEmail = document.getElementById('authEmail');

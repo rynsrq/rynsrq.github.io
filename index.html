@@ -416,29 +416,79 @@
 
     // --- REAL-TIME DATA LISTENER ---
     function setupRealtimeListener() {
-        if (!db || !userId) return;
+    if (!db || !userId) return;
 
-        const q = query(collection(db, getSessionsPath()), orderBy("start", "desc"));
+    // ... (Existing sessions listener code remains here) ...
+    const q = query(collection(db, getSessionsPath()), orderBy("start", "desc"));
 
-        unsubscribeSessions = onSnapshot(q, (snapshot) => {
-            sessionsCache = {};
-            snapshot.docs.forEach(doc => {
-                const session = doc.data();
-                session.id = doc.id; 
-                const dateKey = session.dateKey; 
+    unsubscribeSessions = onSnapshot(q, (snapshot) => {
+        // ... (existing sessionsCache update and renderHome/Calendar calls) ...
+        // Your current sessions list updates happen here
+        sessionsCache = {};
+        snapshot.docs.forEach(doc => {
+            const session = doc.data();
+            session.id = doc.id; 
+            const dateKey = session.dateKey; 
 
-                if (!sessionsCache[dateKey]) {
-                    sessionsCache[dateKey] = [];
-                }
-                sessionsCache[dateKey].push(session);
-            });
-            renderHome();
-            renderCalendar(currentYear, currentMonth);
-            renderMonths();
-        }, (error) => {
-            console.error("Error setting up real-time listener:", error);
+            if (!sessionsCache[dateKey]) {
+                sessionsCache[dateKey] = [];
+            }
+            sessionsCache[dateKey].push(session);
         });
+        renderHome();
+        renderCalendar(currentYear, currentMonth);
+        renderMonths();
+    }, (error) => {
+        console.error("Error setting up real-time listener:", error);
+    });
+    
+    // --- NEW RUNNING STATE LISTENER ---
+    if (unsubscribeRunningState) {
+        unsubscribeRunningState();
     }
+    
+    unsubscribeRunningState = onSnapshot(getRunningStateDocRef(), (doc) => {
+        const isTimerRunningOnServer = doc.exists() && doc.data().isRunning;
+
+        if (isTimerRunningOnServer) {
+            const state = doc.data();
+            
+            // Only take action if this device is NOT currently running its local timer
+            if (!running) { 
+                running = true;
+                startTs = state.startTs;
+                
+                // Start the local timer interval on this device
+                timerId = setInterval(() => { updateFab(); renderRunningSession(); }, 300);
+                
+                // Update button text and color to reflect the running state
+                startBtn.textContent = 'Stop'; 
+                startBtn.style.background = 'var(--accent)'; 
+                startBtn.style.color = 'var(--accent-text)'; 
+                miniToday.classList.add('running');
+            }
+        } else {
+            // The timer has been STOPPED on another device
+            if (running) {
+                running = false;
+                clearInterval(timerId); 
+                timerId = null;
+                startTs = null;
+
+                // Reset the button appearance
+                startBtn.textContent = 'Start'; 
+                startBtn.style.background = 'var(--accent)'; 
+                startBtn.style.color = 'var(--accent-text)'; 
+                miniToday.classList.remove('running');
+            }
+        }
+        updateFab();
+        updateMiniVisibility();
+    }, (error) => {
+        console.error("Error setting up running state listener:", error);
+    });
+    }
+    
 
     function getSessionsByDate(dateKey) {
         return sessionsCache[dateKey] || [];

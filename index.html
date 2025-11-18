@@ -480,7 +480,7 @@ function getLocalDateKey(d = new Date()) {
         const sessionData = {
             start: startDate.toISOString(),
             end: new Date(end).toISOString(),
-            dateKey: startDate.toISOString().slice(0, 10),
+            dateKey: getLocalDateKey(startDate),
             secs: secs,
             timestamp: Date.now()
         };
@@ -601,8 +601,10 @@ function getLocalDateKey(d = new Date()) {
     function renderHome(){ 
       if (!isAuthReady || !userId) return; 
 
-      const todayKey=new Date().toISOString().slice(0,10); 
+
+      const todayKey=getLocalDateKey(); // <-- Uses current local date for "Today"
       const arr = getSessionsByDate(todayKey).sort((a, b) => new Date(b.start) - new Date(a.start));
+      
 
       sessionList.innerHTML='';
 

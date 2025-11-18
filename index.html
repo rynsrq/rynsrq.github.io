@@ -458,7 +458,15 @@
     let lastDeleted = null;
     const toast=document.getElementById('toast'); const toastText=document.getElementById('toastText'); const undoBtn=document.getElementById('undoBtn');
     let toastTimer=null;
-
+    
+    // Function to get local date key (YYYY-MM-DD)
+function getLocalDateKey(d = new Date()) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+}
+    
     function pad(n){ return String(n).padStart(2,'0') }
     function secsToHMS(total){ total=Math.floor(total); const h=Math.floor(total/3600); const m=Math.floor((total%3600)/60); const s=total%60; return `${pad(h)}:${pad(m)}:${pad(s)}` }
     function shortHours(total){ if(!total) return '0h 0m'; const h=Math.floor(total/3600); const m=Math.floor((total%3600)/60); return `${h}h ${m}m` }

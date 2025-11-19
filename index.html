@@ -564,49 +564,70 @@ function getLocalDateKey(d = new Date()) {
             console.error("Error deleting running state:", e);
         }
     }
+     startBtn.addEventListener('click', async ()=>{
+    if (!userId) return alert('Please sign in to start tracking.');
 
-    startBtn.addEventListener('click', async ()=>{
-      if (!userId) return alert('Please sign in to start tracking.');
-      if(!running){
-      const now = Date.now();
-      running = true; // Set state locally immediately
+    if(!running){ // <-- START LOGIC (if timer is NOT running)
+        const now = Date.now();
+        
+        // 1. Set temporary running state and UI (Icon only, no text)
+        running = true; 
+        startBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M10 8h4v8h-4z"/></svg>';
+        startBtn.style.background = 'gray'; 
+        startBtn.style.color = 'var(--white)'; 
+        
+        try {
+            // 2. Wait for the asynchronous save operation
+            await saveRunningState(now); 
+            
+            startTs = now; 
+            
+            // 3. ON SUCCESS: Finalize the running UI state
+            startBtn.style.background = 'var(--accent)'; 
+            startBtn.style.color = 'var(--accent-text)'; 
+            miniToday.classList.add('running'); 
+            
+            timerId = setInterval(()=>{ updateFab(); renderRunningSession(); }, 300); 
+            updateFab(); // Force immediate rendering of running time/icon
 
-      // 1. Set button to a temporary processing state (Icon only, no text)
-      //    We use the STOP icon SVG here to indicate processing, but with neutral colors.
-      startBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M10 8h4v8h-4z"/></svg>'; // REMOVED "Starting..." text
-      startBtn.style.background = 'gray'; // Dim the button temporarily
-      startBtn.style.color = 'var(--white)'; 
-      
-      try {
-          // 2. Wait for the asynchronous save operation (Network delay occurs here)
-          await saveRunningState(now); 
-          
-          startTs = now; 
-          
-          // 3. ONLY ON SUCCESS, finalize the running UI state
-          //    The final appearance is handled by updateFab()
-
-          // Revert color to accent immediately
-          startBtn.style.background = 'var(--accent)'; 
-          startBtn.style.color = 'var(--accent-text)'; 
-          miniToday.classList.add('running'); 
-          
-          // Start the interval and call updateFab() immediately to render the time
-          timerId = setInterval(()=>{ updateFab(); renderRunningSession(); }, 300); 
-          updateFab(); // Force immediate rendering of running time/icon
-
-      } catch (e) {
-          // 4. If save fails, revert the state
-          console.error("Failed to start timer:", e);
-          running = false; 
-          startTs = null;
-          updateFab(); // Reverts button back to 'Start' icon/text
-          alert("Error starting timer. See console.");
-      }
+        } catch (e) {
+            // 4. If save fails, revert everything
+            console.error("Failed to start timer:", e);
+            running = false; 
+            startTs = null;
+            updateFab(); 
+            alert("Error starting timer. See console.");
         }
-      
+    }
+    else { // <-- STOP LOGIC (The crucial ELSE block for stopping)
+        const end = Date.now();
+        
+        // 1. Immediately stop the timer and update local state
+        if (timerId) {
+            clearInterval(timerId); 
+        }
+        running = false; 
+        timerId = null;
+        
+        // 2. Immediately reset UI to "Start" state (User feedback)
+        startBtn.textContent = 'Start'; 
+        startBtn.style.background = 'var(--accent)'; 
+        startBtn.style.color = 'var(--accent-text)'; 
+        miniToday.classList.remove('running');
+        updateFab();
+        
+        // 3. Handle asynchronous database operations
+        try {
+            await deleteRunningState();
+            await saveSession(startTs, end); 
+            startTs = null;
+        } catch (e) {
+            console.error("Error saving/deleting state on stop:", e);
+            alert("Error saving session. Check console.");
+        }
+    }
     });
-
+    
     function calculateTotalTodaySecs(isRunning, startTimestamp) {
     if (!userId) return 0;
 

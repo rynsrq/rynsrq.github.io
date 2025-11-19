@@ -602,14 +602,29 @@ function getLocalDateKey(d = new Date()) {
     });
 
     function calculateTotalTodaySecs(isRunning, startTimestamp) {
-        if (!userId) return 0;
-        const todayKey = new Date().toISOString().slice(0, 10);
-        let totalSecs = (sessionsCache[todayKey] || []).reduce((a, b) => a + b.secs, 0);
-        if (isRunning && startTimestamp) {
-            totalSecs += Math.floor((Date.now() - startTimestamp) / 1000);
+    if (!userId) return 0;
+
+    // Use the function that returns the local date string (YYYY-MM-DD)
+    const todayKey = getLocalDateKey(); 
+    
+    // Calculate total seconds from saved sessions ONLY for today
+    let totalSecs = (sessionsCache[todayKey] || []).reduce((a, b) => a + b.secs, 0);
+
+    // Add running time if the timer is active
+    if (isRunning && startTimestamp) {
+        let runningSecs = Math.floor((Date.now() - startTimestamp) / 1000);
+        
+        // Safety check to prevent negative time errors during sync
+        if (runningSecs < 0) {
+            runningSecs = 0;
         }
-        return totalSecs;
+
+        totalSecs += runningSecs;
     }
+    
+    return totalSecs;
+    }
+    
 
     function updateFab(){ 
       const totalTodaySecs = calculateTotalTodaySecs(running, startTs);

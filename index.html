@@ -905,7 +905,7 @@ function openModalForDate(dateKey){
       if (!isAuthReady || !userId) return; 
       calendarGrid.innerHTML=''; 
       monthTitleText.textContent = new Date(year,month,1).toLocaleString(undefined,{month:'long',year:'numeric'});
-      const first=new Date(year,month,1); const leading=(first.getDay()+6)%7; const daysInMonth=new Date(year,month+1,0).getDate(); const total=leading+daysInMonth; const rows=Math.ceil(total/7);
+      const first=new Date(year,month,1); const leading=first.getDay(); const daysInMonth=new Date(year,month+1,0).getDate(); const total=leading+daysInMonth; const rows=Math.ceil(total/7);
       
       for(let i=0;i<leading;i++){ const c=document.createElement('div'); calendarGrid.appendChild(c); }
       for(let d=1; d<=daysInMonth; d++){ 

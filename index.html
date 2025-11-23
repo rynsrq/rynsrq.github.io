@@ -522,7 +522,19 @@ function getLocalDateKey(d = new Date()) {
     function secsToHMS(total){ total=Math.floor(total); const h=Math.floor(total/3600); const m=Math.floor((total%3600)/60); const s=total%60; return `${pad(h)}:${pad(m)}:${pad(s)}` }
     function shortHours(total){ if(!total) return '0h 0m'; const h=Math.floor(total/3600); const m=Math.floor((total%3600)/60); return `${h}h ${m}m` }
     function fmtTime(iso){ const d=new Date(iso); return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+    function formatSessionDuration(totalSecs){
+    if (totalSecs < 60) return '0 min'; // For very short sessions
+    
+    const h = Math.floor(totalSecs / 3600);
+    const m = Math.floor((totalSecs % 3600) / 60);
 
+    if (h > 0) {
+        return `${h} hour ${m} min`;
+    } else {
+        return `${m} min`;
+    }
+}
+    
     async function saveSession(start, end){ 
         if (!db || !userId) return;
         const startDate=new Date(start);

@@ -1,0 +1,998 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Study Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#2f2418;
+      --surface:#231a12;
+      --panel:#3b3026;
+      --muted:#b8a995;
+      --accent:#f6c9d2; /* start peel color */
+      --accent-text:#241916; /* text color on accent */
+      --white:#fff6f6;
+      --radius:14px;
+      --safe-bottom: env(safe-area-inset-bottom, 12px);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;background:var(--bg);color:var(--white);-webkit-font-smoothing:antialiased}
+    .app{
+      width:100%;
+      max-width:420px;
+      margin:0 auto;
+      padding:14px 12px calc(120px + var(--safe-bottom));
+    }
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    header h1{font-size:20px;margin:0;font-weight:700}
+    header .sub{font-size:12px;color:var(--muted)}
+    .list{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+    .session{display:flex;align-items:center;justify-content:space-between;padding:10px 10px;border-radius:12px;min-height:48px;transition:transform .18s ease;background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));color:var(--white);font-size:14px}
+    .session .left{display:flex;gap:10px;align-items:center}
+    .session .time-s{font-weight:700;font-size:15px}
+    .session .dur{font-size:13px;color:var(--muted)}
+    .session .actions{display:flex;gap:8px;align-items:center}
+    .btn{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:10px;color:var(--white);font-weight:600;font-size:13px}
+    .btn.danger{border-color:rgba(255,80,80,0.3);color:#ffb8b8}
+    .session.swiped{transform:translateX(-82px)}
+    /* Start FAB (peel) */
+    .fab{position:fixed;right:14px;bottom:120px;background:var(--accent);color:var(--accent-text);padding:12px 18px;border-radius:28px;box-shadow:0 10px 30px rgba(0,0,0,0.35);display:flex;gap:8px;align-items:center;font-weight:700;border:0;z-index:40;font-size:14px}
+    .fab svg{width:18px;height:18px}
+    /* MINI TODAY pill — made identical to FAB but placed on left */
+    .mini-today{
+      position:fixed;
+      left:14px;
+      bottom:120px;
+      background:var(--accent);
+      color:var(--accent-text);
+      padding:12px 18px;
+      border-radius:28px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.35);
+      display:none;
+      align-items:center;
+      gap:8px;
+      font-weight:700;
+      z-index:40;
+      font-size:14px;
+    }
+    .mini-today.visible{display:flex}
+    /* when not running we keep same appearance (per request exact same color & size as start peel) */
+    .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:96px;background:#1f1a17;padding:12px 16px;border-radius:12px;display:none;align-items:center;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,0.5);z-index:41}
+    .toast.show{display:flex}
+    .toast button{background:transparent;border:0;color:var(--accent);font-weight:700}
+    .month-title{font-size:18px;margin:6px 0 8px;display:flex;align-items:center;justify-content:space-between}
+    .month-title button{background:transparent;border:0;color:var(--muted);font-weight:700;padding:8px;border-radius:10px}
+    .weekdays{display:flex;gap:6px;color:var(--muted);margin-bottom:8px}
+    .weekdays div{flex:1;text-align:center;font-size:12px}
+    .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+    .circle-day{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.03);color:var(--muted);margin:auto;font-weight:700;position:relative;font-size:13px;transition:all .18s ease}
+    .circle-day.today{outline:3px solid rgba(245,183,198,0.18)}
+    /* session-day uses same color as start peel */
+    .circle-day.has-session{
+      background: var(--accent);
+      color: var(--accent-text);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.18);
+      font-weight:800;
+    }
+    .month-block{margin-bottom:20px}
+    .month-label{font-size:18px;margin:6px 0;color:var(--white)}
+    .months-row{display:flex;gap:8px;overflow:auto;padding:8px 4px}
+    .month-box{min-width:86px;padding:10px;border-radius:12px;background:var(--panel);text-align:center}
+    .section{background:var(--panel);padding:12px;border-radius:12px;margin-top:12px}
+    .section h3{margin:0 0 10px 0;color:var(--white);font-size:15px}
+    .row{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:12px;background:rgba(255,255,255,0.02);margin-bottom:8px;font-size:14px}
+    .row .label{display:flex;gap:12px;align-items:center}
+    .row small{color:var(--muted)}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+    .modal{background:var(--surface);padding:12px;border-radius:12px;max-width:420px;width:100%;max-height:80vh;overflow:auto}
+    .modal h4{margin:0 0 8px}
+    .modal .sess-row{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:10px;background:rgba(255,255,255,0.02);margin-bottom:8px}
+    .modal label{font-size:13px;color:var(--muted)}
+    
+    .auth-form input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(0,0,0,0.1);
+      color: var(--white);
+      font-size: 16px;
+    }
+    .auth-form button {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      font-weight: 700;
+      margin-top: 10px;
+    }
+    .auth-form .primary {
+      background: var(--accent);
+      color: var(--accent-text);
+    }
+    .auth-form .secondary {
+      background: var(--panel);
+      color: var(--white);
+      margin-top: 5px;
+    }
+
+
+    .bottom-nav{position:fixed;left:0;right:0;bottom:0;height:76px;background:#3b2f24;display:flex;gap:8px;align-items:center;justify-content:space-around;padding:12px;border-top-left-radius:12px;border-top-right-radius:12px;z-index:39}
+    .nav-item{flex:1;text-align:center;color:var(--muted);font-weight:700;padding:8px;border-radius:12px}
+    .nav-item.active{background:#2a2118;padding:10px;border-radius:18px;color:var(--white)}
+    @media (max-width:360px){
+      .app{padding:12px 10px calc(120px + var(--safe-bottom));}
+      .session{padding:10px}
+      header h1{font-size:18px}
+      .mini-today{left:10px;bottom:120px;padding:10px 14px}
+    }
+  </style>
+      <link rel="icon" type="image/x-icon" href="/favicon.png">
+</head>
+<body>
+  <div class="app" id="app">
+    <header>
+      <div>
+        <h1 id="pageTitle">Home</h1>
+        <div class="sub" id="subTitle">Today</div>
+      </div>
+      <div class="sub" id="clock">--:--</div>
+    </header>
+
+    <!-- HOME -->
+    <main id="homeView">
+      <div class="list" id="sessionList"></div>
+      <div id="summaryRow" style="margin-top:8px;display:flex;gap:8px">
+        <div id="todayCard" style="flex:1;background:rgba(255,255,255,0.02);padding:10px;border-radius:12px;text-align:center">Today<br><strong id="sumToday">0h 0m</strong></div>
+        <div style="flex:1;background:rgba(255,255,255,0.02);padding:10px;border-radius:12px;text-align:center">This Week<br><strong id="sumWeek">0h 0m</strong></div>
+        <div style="flex:1;background:rgba(255,255,255,0.02);padding:10px;border-radius:12px;text-align:center">This Month<br><strong id="sumMonth">0h 0m</strong></div>
+      </div>
+    </main>
+
+    <!-- CALENDAR -->
+    <main id="calendarView" style="display:none">
+      <div class="month-block">
+        <div class="month-title"><button id="prevMonth">◀</button><div id="monthTitleText">Month</div><button id="nextMonth">▶</button></div>
+        <div class="weekdays"><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div><div>S</div></div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+      </div>
+      <div class="month-block" style="margin-top:6px">
+        <div class="month-label">Last 12 months</div>
+        <div class="months-row" id="monthsList"></div>
+      </div>
+    </main>
+
+    <!-- CONFIG / LOGIN GATE -->
+    <main id="configView" style="display:none">
+        
+        <div class="section" id="authSection">
+            <h3>Account Access</h3>
+            <p style="color: var(--muted); margin-bottom: 20px; font-size: 14px;">Log in to sync your data across all devices.</p>
+            <div id="authStatusRow">
+                <div id="authStatusText" style="font-weight: 700; color: var(--accent); margin-bottom: 10px;">Status: Loading...</div>
+            </div>
+
+            <div class="auth-form" id="authControls" style="display:none;">
+                <input type="email" id="authEmail" placeholder="Email Address">
+                <input type="password" id="authPassword" placeholder="Password (min 6 chars)">
+                <button id="loginBtn" class="primary">Log In</button>
+                <button id="signupBtn" class="secondary">Create Account</button>
+                <p id="authMessage" style="color: #ffb8b8; margin-top: 10px; font-size: 13px; height: 1.2em;"></p>
+            </div>
+
+            <div id="logoutControl" style="text-align:center; margin-top:15px; display:none;">
+                <button class="btn danger" id="logoutBtn">Log Out</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal for day sessions -->
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal" role="dialog" aria-modal="true" id="modal">
+        <h4 id="modalTitle">Sessions</h4>
+        <div id="modalContent"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button class="btn" id="closeModal">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- undo toast -->
+    <div class="toast" id="toast"><div id="toastText">Deleted</div><button id="undoBtn">Undo</button></div>
+
+    <!-- Mini today's pill (hidden by default, shows when total time > 0 or running) -->
+    <div id="miniToday" class="mini-today" aria-hidden="true"></div>
+
+    <button class="fab" id="startBtn" style="display:none;"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M5 3v18l15-9L5 3z"/></svg> Start</button>
+
+  </div>
+
+  <div class="bottom-nav">
+    <div class="nav-item active" id="navHome">Home</div>
+    <div class="nav-item" id="navCalendar">Calendar</div>
+    <div class="nav-item" id="navConfig">Others</div>
+  </div>
+
+  <script type="module">
+    // --- FIREBASE CONFIGURATION AND INITIALIZATION ---
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { 
+        getAuth, 
+        onAuthStateChanged, 
+        signOut,
+        createUserWithEmailAndPassword,
+        signInWithEmailAndPassword
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, getDoc, addDoc, deleteDoc, onSnapshot, collection, query, writeBatch, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // PASTE YOUR CONFIG HERE (MUST BE UPDATED)
+    const firebaseConfig = {
+      apiKey: "AIzaSyAeTzfg4WhmuGrGwHVShDJ_oNHYW8EgBZw", 
+      authDomain: "time-tracker-ff.firebaseapp.com",
+      projectId: "time-tracker-ff", 
+      storageBucket: "time-tracker-ff.firebasestorage.app",
+      messagingSenderId: "516931076456",
+      appId: "1:516931076456:web:dac05b772bcfc02bff16dd"
+    };
+
+    let app;
+    let db;
+    let auth;
+    let userId = null;
+    let isAuthReady = false;
+    let sessionsCache = {};
+    let unsubscribeSessions = null; 
+    let unsubscribeRunningState = null;
+    
+    // DOM References for Auth
+    const authControls = document.getElementById('authControls');
+    const authEmail = document.getElementById('authEmail');
+    const authPassword = document.getElementById('authPassword');
+    const loginBtn = document.getElementById('loginBtn');
+    const signupBtn = document.getElementById('signupBtn');
+    const authMessage = document.getElementById('authMessage');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const logoutControl = document.getElementById('logoutControl');
+    const authStatusText = document.getElementById('authStatusText');
+
+    // Firestore Path Helpers
+    const getSessionsPath = () => `users/${userId}/sessions`;
+    const getRunningStateDocRef = () => doc(db, `users/${userId}/state/runningTimer`);
+
+    // --- NAVIGATION AND VIEW CONTROL ---
+    function updateView(viewId) {
+        // Protect Home and Calendar views
+        if ((viewId === 'homeView' || viewId === 'calendarView') && !userId) {
+            viewId = 'configView'; // Force login gate in config tab
+            setActive(navConfig);
+            alert("Please sign in on the Others tab to view data.");
+        }
+
+        // Hide all main views
+        document.getElementById('homeView').style.display = 'none';
+        document.getElementById('calendarView').style.display = 'none';
+        document.getElementById('configView').style.display = 'none';
+        
+        // Show the requested view
+        document.getElementById(viewId).style.display = 'block';
+        document.getElementById('pageTitle').textContent = viewId === 'homeView' ? 'Home' : (viewId === 'calendarView' ? 'Calendar' : 'Others');
+
+        // Manage FAB and Mini Peel visibility
+        startBtn.style.display = (viewId === 'homeView' && userId && isAuthReady) ? 'flex' : 'none';
+        
+        if (userId) {
+            // Render when switching to a main view if authenticated
+            if (viewId === 'homeView') renderHome();
+            if (viewId === 'calendarView') {
+                renderCalendar(currentYear, currentMonth);
+                renderMonths();
+            }
+        }
+        updateMiniVisibility();
+    }
+
+    // AUTHENTICATION HANDLERS
+    function setAuthError(message) {
+        authMessage.textContent = message;
+        setTimeout(() => authMessage.textContent = '', 5000);
+    }
+
+    loginBtn.addEventListener('click', async () => {
+        const email = authEmail.value;
+        const password = authPassword.value;
+        if (!email || password.length < 6) return setAuthError('Enter valid email and password (min 6 chars).');
+
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+        } catch (error) {
+            console.error("Login Error:", error);
+            setAuthError(error.message.replace('Firebase: Error (auth/', '').replace(').', ''));
+        }
+    });
+
+    signupBtn.addEventListener('click', async () => {
+        const email = authEmail.value;
+        const password = authPassword.value;
+        if (!email || password.length < 6) return setAuthError('Enter valid email and password (min 6 chars).');
+        
+        try {
+            await createUserWithEmailAndPassword(auth, email, password);
+            setAuthError('Account created successfully! Auto-logging in.');
+        } catch (error) {
+            console.error("Signup Error:", error);
+            setAuthError(error.message.replace('Firebase: Error (auth/', '').replace(').', ''));
+        }
+    });
+
+    logoutBtn.addEventListener('click', async () => {
+        if (running) {
+             alert("Cannot log out: please stop the active timer first.");
+             return;
+        }
+        try {
+            await signOut(auth);
+        } catch (e) {
+            console.error("Logout Error:", e);
+        }
+    });
+
+    // FIREBASE INIT
+    async function initFirebase() {
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+
+            onAuthStateChanged(auth, async (user) => {
+                isAuthReady = true;
+                if (user) {
+                    userId = user.uid;
+                    authStatusText.textContent = `Signed in as: ${user.email}`;
+                    authControls.style.display = 'none';
+                    logoutControl.style.display = 'block';
+                    
+                    if (unsubscribeSessions) {
+                        unsubscribeSessions();
+                        unsubscribeSessions = null;
+                    }
+                    
+                   
+                    setupRealtimeListener();
+
+                    const currentViewId = document.querySelector('main:not([style*="display: none"]):not([style*="display:none;"])')?.id;
+                    if (currentViewId === 'homeView' || currentViewId === 'calendarView' || !currentViewId) {
+                         updateView('homeView');
+                         setActive(navHome);
+                    }
+
+                } else {
+                    userId = null;
+                    sessionsCache = {};
+                    authStatusText.textContent = `Status: Not Signed In`;
+                    authControls.style.display = 'block'; 
+                    logoutControl.style.display = 'none';
+                    
+                    if (timerId) clearInterval(timerId);
+                    running = false; startTs = null;
+                    updateFab(); 
+                    
+                    if (unsubscribeSessions) {
+                        unsubscribeSessions();
+                        unsubscribeSessions = null;
+                    }
+
+                    updateView('configView');
+                    setActive(navConfig);
+                }
+            });
+        } catch (error) {
+            console.error("Firebase Initialization Error:", error);
+            authStatusText.textContent = `Error: Check Firebase config/console.`;
+        }
+    }
+    
+    async function resumeRunningTimer() {
+        if (!db || !userId) return;
+
+        const stateDoc = await getDoc(getRunningStateDocRef());
+        if (stateDoc.exists() && stateDoc.data().isRunning) {
+            const state = stateDoc.data();
+            running = true;
+            startTs = state.startTs;
+            
+            updateFab(); 
+            timerId = setInterval(()=>{ updateFab(); renderRunningSession(); }, 300);
+            
+            startBtn.textContent = 'Stop'; 
+            startBtn.style.background = 'var(--accent)'; 
+            startBtn.style.color = 'var(--accent-text)'; 
+            miniToday.classList.add('running');
+        }
+    }
+
+
+    // --- REAL-TIME DATA LISTENER ---
+    function setupRealtimeListener() {
+    if (!db || !userId) return;
+
+    // ... (Existing sessions listener code remains here) ...
+    const q = query(collection(db, getSessionsPath()), orderBy("start", "desc"));
+
+    unsubscribeSessions = onSnapshot(q, (snapshot) => {
+        // ... (existing sessionsCache update and renderHome/Calendar calls) ...
+        // Your current sessions list updates happen here
+        sessionsCache = {};
+        snapshot.docs.forEach(doc => {
+            const session = doc.data();
+            session.id = doc.id; 
+            const dateKey = session.dateKey; 
+
+            if (!sessionsCache[dateKey]) {
+                sessionsCache[dateKey] = [];
+            }
+            sessionsCache[dateKey].push(session);
+        });
+        renderHome();
+        renderCalendar(currentYear, currentMonth);
+        renderMonths();
+    }, (error) => {
+        console.error("Error setting up real-time listener:", error);
+    });
+    
+    // --- NEW RUNNING STATE LISTENER ---
+    if (unsubscribeRunningState) {
+        unsubscribeRunningState();
+    }
+    
+    unsubscribeRunningState = onSnapshot(getRunningStateDocRef(), (doc) => {
+        const isTimerRunningOnServer = doc.exists() && doc.data().isRunning;
+
+        if (isTimerRunningOnServer) {
+            const state = doc.data();
+            
+            // Only take action if this device is NOT currently running its local timer
+            if (!running) { 
+                running = true;
+                startTs = state.startTs;
+                
+                // Start the local timer interval on this device
+                timerId = setInterval(() => { updateFab(); renderRunningSession(); }, 300);
+                
+                // Update button text and color to reflect the running state
+                startBtn.textContent = 'Stop'; 
+                startBtn.style.background = 'var(--accent)'; 
+                startBtn.style.color = 'var(--accent-text)'; 
+                miniToday.classList.add('running');
+            }
+        } else {
+            // The timer has been STOPPED on another device
+            if (running) {
+                running = false;
+                clearInterval(timerId); 
+                timerId = null;
+                startTs = null;
+
+                // Reset the button appearance
+                startBtn.textContent = 'Start'; 
+                startBtn.style.background = 'var(--accent)'; 
+                startBtn.style.color = 'var(--accent-text)'; 
+                miniToday.classList.remove('running');
+            }
+        }
+        updateFab();
+        updateMiniVisibility();
+    }, (error) => {
+        console.error("Error setting up running state listener:", error);
+    });
+    }
+    
+
+    function getSessionsByDate(dateKey) {
+        return sessionsCache[dateKey] || [];
+    }
+
+    // --- APPLICATION LOGIC ---
+    let running=false, startTs=null, timerId=null;
+    const startBtn=document.getElementById('startBtn');
+    const miniToday=document.getElementById('miniToday');
+    const sessionList=document.getElementById('sessionList');
+    const sumTodayEl=document.getElementById('sumToday');
+    const sumWeekEl=document.getElementById('sumWeek');
+    const sumMonthEl=document.getElementById('sumMonth');
+    const calendarGrid=document.getElementById('calendarGrid');
+    const monthTitleText=document.getElementById('monthTitleText');
+    const monthsList=document.getElementById('monthsList');
+    const summaryRow=document.getElementById('summaryRow');
+    let lastDeleted = null;
+    const toast=document.getElementById('toast'); const toastText=document.getElementById('toastText'); const undoBtn=document.getElementById('undoBtn');
+    let toastTimer=null;
+    
+    // Function to get local date key (YYYY-MM-DD)
+function getLocalDateKey(d = new Date()) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+}
+    
+    function pad(n){ return String(n).padStart(2,'0') }
+    function secsToHMS(total){ total=Math.floor(total); const h=Math.floor(total/3600); const m=Math.floor((total%3600)/60); const s=total%60; return `${pad(h)}:${pad(m)}:${pad(s)}` }
+    function shortHours(total){ if(!total) return '0h 0m'; const h=Math.floor(total/3600); const m=Math.floor((total%3600)/60); return `${h}h ${m}m` }
+    function fmtTime(iso){ const d=new Date(iso); return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+
+    async function saveSession(start, end){ 
+        if (!db || !userId) return;
+        const startDate=new Date(start);
+        const secs=Math.floor((new Date(end)-new Date(start))/1000); 
+
+        const sessionData = {
+            start: startDate.toISOString(),
+            end: new Date(end).toISOString(),
+            dateKey: getLocalDateKey(startDate),
+            secs: secs,
+            timestamp: Date.now()
+        };
+
+        try {
+            await addDoc(collection(db, getSessionsPath()), sessionData);
+        } catch (e) {
+            console.error("Error adding document: ", e);
+            alert("Error saving session. Check console.");
+        }
+    }
+
+    async function saveRunningState(startTs) {
+        if (!db || !userId) return;
+        try {
+            const batch = writeBatch(db);
+            batch.set(getRunningStateDocRef(), { isRunning: true, startTs: startTs });
+            await batch.commit();
+        } catch (e) {
+            console.error("Error saving running state:", e);
+            alert("Error saving running state. Check console.");
+        }
+    }
+
+    async function deleteRunningState() {
+        if (!db || !userId) return;
+        try {
+            await deleteDoc(getRunningStateDocRef());
+        } catch (e) {
+            console.error("Error deleting running state:", e);
+        }
+    }
+     startBtn.addEventListener('click', async ()=>{
+    if (!userId) return alert('Please sign in to start tracking.');
+
+    if(!running){ // <-- START LOGIC (if timer is NOT running)
+        const now = Date.now();
+        
+        // 1. Set temporary running state and UI (Icon only, no text)
+        running = true; 
+        startBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M10 8h4v8h-4z"/></svg>';
+        startBtn.style.background = 'gray'; 
+        startBtn.style.color = 'var(--white)'; 
+        
+        try {
+            // 2. Wait for the asynchronous save operation
+            await saveRunningState(now); 
+            
+            startTs = now; 
+            
+            // 3. ON SUCCESS: Finalize the running UI state
+            startBtn.style.background = 'var(--accent)'; 
+            startBtn.style.color = 'var(--accent-text)'; 
+            miniToday.classList.add('running'); 
+            
+            timerId = setInterval(()=>{ updateFab(); renderRunningSession(); }, 300); 
+            updateFab(); // Force immediate rendering of running time/icon
+
+        } catch (e) {
+            // 4. If save fails, revert everything
+            console.error("Failed to start timer:", e);
+            running = false; 
+            startTs = null;
+            updateFab(); 
+            alert("Error starting timer. See console.");
+        }
+    }
+    else { // <-- STOP LOGIC (The crucial ELSE block for stopping)
+        const end = Date.now();
+        
+        // 1. Immediately stop the timer and update local state
+        if (timerId) {
+            clearInterval(timerId); 
+        }
+        running = false; 
+        timerId = null;
+        
+        // 2. Immediately reset UI to "Start" state (User feedback)
+        startBtn.textContent = 'Start'; 
+        startBtn.style.background = 'var(--accent)'; 
+        startBtn.style.color = 'var(--accent-text)'; 
+        miniToday.classList.remove('running');
+        updateFab();
+        
+        // 3. Handle asynchronous database operations
+        try {
+            await deleteRunningState();
+            await saveSession(startTs, end); 
+            startTs = null;
+        } catch (e) {
+            console.error("Error saving/deleting state on stop:", e);
+            alert("Error saving session. Check console.");
+        }
+    }
+    });
+    
+    function calculateTotalTodaySecs(isRunning, startTimestamp) {
+    if (!userId) return 0;
+
+    // Use the function that returns the local date string (YYYY-MM-DD)
+    const todayKey = getLocalDateKey(); 
+    
+    // Calculate total seconds from saved sessions ONLY for today
+    let totalSecs = (sessionsCache[todayKey] || []).reduce((a, b) => a + b.secs, 0);
+
+    // Add running time if the timer is active
+    if (isRunning && startTimestamp) {
+        let runningSecs = Math.floor((Date.now() - startTimestamp) / 1000);
+        
+        // Safety check to prevent negative time errors during sync
+        if (runningSecs < 0) {
+            runningSecs = 0;
+        }
+
+        totalSecs += runningSecs;
+    }
+    
+    return totalSecs;
+    }
+    
+
+    function updateFab(){ 
+      const totalTodaySecs = calculateTotalTodaySecs(running, startTs);
+      const totalHtml = shortHours(totalTodaySecs);
+
+      miniToday.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M10 8h4v8h-4z"/></svg> ${totalHtml}`;
+
+        if(running && startTs){ 
+        let secs = Math.floor((Date.now() - startTs) / 1000);
+        
+        // --- ADDED SAFETY CHECK ---
+        // Prevents negative numbers from being formatted on brief sync lag
+        if (secs < 0) {
+            secs = 0; 
+        }
+        
+        const timeHtml = secsToHMS(secs);
+        const fabHtml = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M10 8h4v8h-4z"/></svg> ${timeHtml}`; 
+        startBtn.innerHTML = fabHtml; 
+        } else { 
+        // ... (rest of the else block)
+              
+        const html = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M5 3v18l15-9L5 3z"/></svg> Start`; 
+        startBtn.innerHTML = html; 
+      }
+    }
+
+    function renderRunningSession(){ 
+        if(!running || !startTs) return; 
+        
+        const secs=Math.floor((Date.now()-startTs)/1000); 
+        const virtual={
+            start: new Date(startTs).toISOString(), 
+            end: new Date().toISOString(), 
+            secs: secs
+        }; 
+        
+        const top = document.querySelector('.session.virtual'); 
+        if(top){ 
+            const span = top.querySelector('.time-s'); 
+            span.textContent = fmtTime(virtual.start); 
+            const dur = top.querySelector('.dur'); 
+            dur.textContent = `── ${Math.round(virtual.secs/60)} min ──`; 
+            const right = top.querySelector('.right'); 
+            right.textContent = fmtTime(virtual.end); 
+        } 
+    }
+
+    function renderHome(){ 
+      if (!isAuthReady || !userId) return; 
+
+
+      const todayKey=getLocalDateKey(); // <-- Uses current local date for "Today"
+      const arr = getSessionsByDate(todayKey).sort((a, b) => new Date(b.start) - new Date(a.start));
+      
+
+      sessionList.innerHTML='';
+
+      if(running && startTs){ 
+        const virtual=document.createElement('div'); 
+        virtual.className='session virtual'; 
+        virtual.innerHTML=`<div class="left"><div class="time-s">${fmtTime(new Date(startTs).toISOString())}</div><div class="dur">── 0 min ──</div></div><div class="actions"></div><div class="right">${fmtTime(new Date().toISOString())}</div>`; 
+        sessionList.appendChild(virtual); 
+        attachSwipeHandlers(virtual, null, null); 
+      }
+
+      arr.forEach((s)=>{
+        const el=document.createElement('div'); 
+        el.className='session';
+        el.dataset.id = s.id; 
+        el.dataset.date = todayKey;
+        el.innerHTML = `<div class="left"><div class="time-s">${fmtTime(s.start)}</div><div class="dur">── ${Math.round(s.secs/60)} min ──</div></div><div class="actions"></div><div class="right">${fmtTime(s.end)}</div>`;
+        sessionList.appendChild(el);
+        attachSwipeHandlers(el, todayKey, s.id);
+      });
+
+      const todaySecs = (sessionsCache[todayKey] || []).reduce((a,b)=>a + b.secs,0); 
+      sumTodayEl.textContent = shortHours(todaySecs);
+      
+      const startW = startOfWeek(new Date()); 
+      let weekSecs=0; 
+      for(let i=0;i<7;i++){ 
+          const d=new Date(startW); d.setDate(startW.getDate()+i); 
+          const key=d.toISOString().slice(0,10); 
+          (sessionsCache[key]||[]).forEach(s=>weekSecs+=s.secs); 
+      } 
+      sumWeekEl.textContent = shortHours(weekSecs);
+      // Corrected Code Block (within renderHome)
+const now=new Date(); const y=now.getFullYear(), m=now.getMonth(); let monthSecs=0; 
+// Loop through ALL date keys in sessionsCache
+Object.keys(sessionsCache).forEach(key => { 
+    const date = new Date(key); 
+    if (date.getFullYear() === y && date.getMonth() === m) { 
+        sessionsCache[key].forEach(s => monthSecs += s.secs); 
+    } 
+}); 
+sumMonthEl.textContent = shortHours(monthSecs); 
+
+
+      updateFab();
+      updateMiniVisibility();
+    }
+
+    function attachSwipeHandlers(el, dateKey, docId){ 
+        let startX=0, startY=0, moved=false; 
+        el.addEventListener('touchstart', (e)=>{ 
+            startX=e.touches[0].clientX; 
+            startY=e.touches[0].clientY; 
+            moved=false; 
+        }, {passive:true});
+        
+        el.addEventListener('touchmove', (e)=>{ 
+            const dx=e.touches[0].clientX - startX; 
+            const dy=e.touches[0].clientY - startY; 
+            if(Math.abs(dy)>30) return; 
+            if(dx<0){ 
+                moved=true; 
+                el.style.transform = `translateX(${dx}px)`; 
+            } 
+        }, {passive:true});
+        
+        el.addEventListener('touchend', (e)=>{ 
+            if(!moved) { 
+                el.style.transform=''; 
+                return;
+            } 
+            const dxEnd = parseFloat((el.style.transform||'translateX(0px)').replace(/translateX\(|px\)/g,'')) || 0; 
+            
+            if(dxEnd < -70){ 
+                if(docId){
+                    deleteSessionWithUndo(docId);
+                } else if(running) { 
+                    startBtn.click(); 
+                } 
+            } 
+            el.style.transform=''; 
+        }, {passive:true});
+        
+        let isDown=false; 
+        let mouseStartX=0; 
+        el.addEventListener('mousedown',(e)=>{ isDown=true; mouseStartX=e.clientX; }); 
+        window.addEventListener('mousemove',(e)=>{ 
+            if(!isDown) return; 
+            const dx=e.clientX - mouseStartX; 
+            if(dx<0) el.style.transform=`translateX(${dx}px)`; 
+        }); 
+        window.addEventListener('mouseup',(e)=>{ 
+            if(!isDown) return; 
+            isDown=false; 
+            const t = el.style.transform || ''; 
+            const dx = parseFloat(t.replace(/translateX\(|px\)/g,''))||0; 
+            if(dx < -70){ 
+                if(docId){
+                    deleteSessionWithUndo(docId);
+                } else if(running) {
+                    startBtn.click();
+                }
+            } 
+            el.style.transform=''; 
+        }); 
+    }
+
+    async function deleteSessionWithUndo(docId){ 
+        if (!db || !userId || !docId) return;
+
+        let sessionToUndo = null;
+        for (const dateKey in sessionsCache) {
+            sessionToUndo = sessionsCache[dateKey].find(s => s.id === docId);
+            if (sessionToUndo) break;
+        }
+
+        if (!sessionToUndo) {
+            console.error("Session not found in cache for deletion.");
+            return;
+        }
+
+        lastDeleted = { docId, sess: sessionToUndo };
+
+        try {
+            await deleteDoc(doc(db, getSessionsPath(), docId));
+            showToast('Deleted', true);
+        } catch (e) {
+            console.error("Error deleting document: ", e);
+            alert("Error deleting session. Check console.");
+        }
+    }
+
+    undoBtn.addEventListener('click', async ()=>{ 
+        if(!lastDeleted || !db || !userId) return; 
+        
+        const { docId, sess } = lastDeleted;
+        
+        const sessionData = { 
+            start: sess.start,
+            end: sess.end,
+            dateKey: sess.dateKey,
+            secs: sess.secs,
+            timestamp: sess.timestamp
+        };
+
+        try {
+            await addDoc(collection(db, getSessionsPath()), sessionData);
+            lastDeleted=null; 
+            hideToast();
+        } catch (e) {
+            console.error("Error undoing deletion:", e);
+            alert("Error undoing deletion. Check console.");
+        }
+    });
+
+    function showToast(text, showUndo=false){ toastText.textContent = text; toast.classList.add('show'); if(toastTimer) clearTimeout(toastTimer); toastTimer = setTimeout(()=>{ hideToast(); lastDeleted=null; }, 5000); }
+    function hideToast(){ toast.classList.remove('show'); if(toastTimer) clearTimeout(toastTimer); toastTimer=null; }
+
+    const modalOverlay=document.getElementById('modalOverlay'); const modalContent=document.getElementById('modalContent'); const modalTitle=document.getElementById('modalTitle'); document.getElementById('closeModal').addEventListener('click', closeModal);
+
+function openModalForDate(dateKey){
+  const arr = getSessionsByDate(dateKey);
+  const total = arr.reduce((a,b)=>a + (b.secs||0),0);
+  
+  modalTitle.textContent = "Total Time on " + dateKey;
+  const h = Math.floor(total/3600);
+  const m = Math.floor((total%3600)/60);
+  let html = "<div style='font-size:18px; padding:20px; text-align:center; font-weight:700; color:var(--accent)'>" + h + "h " + m + "m</div>";
+  if(arr.length===0) {
+    html = "<div style='padding:16px;color:var(--muted); text-align:center;'>No sessions recorded on this day.</div>";
+  }
+  
+  modalContent.innerHTML = html;
+  modalOverlay.style.display='flex';
+}
+
+    function closeModal(){ modalOverlay.style.display='none'; }
+
+    let currentYear=(new Date()).getFullYear(), currentMonth=(new Date()).getMonth();
+    function startOfWeek(d){ const dd=new Date(d); const day=dd.getDay(); const diff = dd.getDate() - day + (day===0?-6:1); dd.setDate(diff); dd.setHours(0,0,0,0); return dd }
+    function sumSecondsForDate(y,m,d){ 
+        const key = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; 
+        const arr = sessionsCache[key]||[]; 
+        return arr.reduce((s,sess)=>s + (sess.secs||0),0) 
+    }
+
+    function renderCalendar(year, month){ 
+      if (!isAuthReady || !userId) return; 
+      calendarGrid.innerHTML=''; 
+      monthTitleText.textContent = new Date(year,month,1).toLocaleString(undefined,{month:'long',year:'numeric'});
+      const first=new Date(year,month,1); const leading=(first.getDay()+6)%7; const daysInMonth=new Date(year,month+1,0).getDate(); const total=leading+daysInMonth; const rows=Math.ceil(total/7);
+      
+      for(let i=0;i<leading;i++){ const c=document.createElement('div'); calendarGrid.appendChild(c); }
+      for(let d=1; d<=daysInMonth; d++){ 
+        const c=document.createElement('div'); 
+        const circle=document.createElement('div'); 
+        circle.className='circle-day'; 
+        circle.textContent=d;
+        const cellDateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        
+        if((sessionsCache[cellDateStr] || []).length > 0) circle.classList.add('has-session');
+       // Use the function that respects the device's current date/time
+        const todayStr = getLocalDateKey(); 
+        if(cellDateStr===todayStr) circle.classList.add('today');
+        
+        
+        circle.addEventListener('click', ()=>{ openModalForDate(cellDateStr); });
+        c.appendChild(circle); calendarGrid.appendChild(c); 
+      }
+      const trailing = rows*7 - total; 
+      for(let j=0;j<trailing;j++){ const c=document.createElement('div'); calendarGrid.appendChild(c); }
+    }
+
+    function updateMiniVisibility(){
+      try{
+        const totalTodaySecs = calculateTotalTodaySecs(running, startTs);
+        const showValue = running || (totalTodaySecs > 0); 
+
+        if(showValue && userId){
+          miniToday.classList.add('visible');
+          updateFab();
+        } else {
+          miniToday.classList.remove('visible');
+        }
+      }catch(e){ console.warn('mini visibility calc failed', e); }
+    }
+
+    document.getElementById('prevMonth').addEventListener('click', ()=>{ currentMonth--; if(currentMonth<0){ currentMonth=11; currentYear--; } renderCalendar(currentYear,currentMonth); updateMiniVisibility(); });
+    document.getElementById('nextMonth').addEventListener('click', ()=>{ currentMonth++; if(currentMonth>11){ currentMonth=0; currentYear++; } renderCalendar(currentYear,currentMonth); updateMiniVisibility(); });
+
+    // NEW CORRECTED RENDER MONTHS FUNCTION FOR FIREBASE VERSION
+
+function renderMonths(){ 
+    // We only need sessionsCache, not loadData()
+    if (!isAuthReady || !userId) return; 
+    monthsList.innerHTML=''; 
+    
+    const data = sessionsCache; // Use the real-time cache
+    const now = new Date();
+    
+    // Loop from the OLDEST month (i=11) down to the NEWEST month (i=0).
+    for(let i=11;i>=0;i--){ 
+        const dt=new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const y=dt.getFullYear(), m=dt.getMonth(); 
+        let msecs=0; 
+        
+        // Calculate total seconds for this month from cache
+        Object.keys(data).forEach(key => {
+            const date = new Date(key);
+            if (date.getFullYear() === y && date.getMonth() === m) {
+                data[key].forEach(s => msecs += s.secs);
+            }
+        });
+
+        const box=document.createElement('div'); 
+        box.className='month-box'; 
+        box.innerHTML=`<div style="font-size:12px">${dt.toLocaleString(undefined,{month:'short',year:'numeric'})}</div><div style="font-weight:700;margin-top:6px">${shortHours(msecs)}</div>`; 
+        
+        // Prepend ensures the newest month (i=0) is placed at the front (far left)
+        monthsList.prepend(box); 
+    } 
+    
+    updateMiniVisibility(); 
+}
+    
+
+    // Removed Export/Import Logic
+    
+    const navHome=document.getElementById('navHome'), navCalendar=document.getElementById('navCalendar'), navConfig=document.getElementById('navConfig');
+    
+    navHome.addEventListener('click', ()=>{ setActive(navHome); updateView('homeView'); });
+    navCalendar.addEventListener('click', ()=>{ setActive(navCalendar); updateView('calendarView'); });
+    navConfig.addEventListener('click', ()=>{ setActive(navConfig); updateView('configView'); });
+
+    function setActive(el){ 
+        document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active')); 
+        el.classList.add('active'); 
+    }
+
+    // Initial check (starts Firebase)
+    initFirebase();
+
+    window.addEventListener('resize', updateMiniVisibility);
+    setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); updateMiniVisibility(); }, 1000);
+    document.addEventListener('keydown', (e)=>{ if(e.key===' ') { e.preventDefault(); startBtn.click(); } });
+  </script>
+</body>
+</html>
+

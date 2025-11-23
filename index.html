@@ -156,7 +156,7 @@
     <main id="calendarView" style="display:none">
       <div class="month-block">
         <div class="month-title"><button id="prevMonth">◀</button><div id="monthTitleText">Month</div><button id="nextMonth">▶</button></div>
-        <div class="weekdays"><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div><div>S</div></div>
+        <div class="weekdays"><div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div></div>
         <div class="calendar-grid" id="calendarGrid"></div>
       </div>
       <div class="month-block" style="margin-top:6px">
@@ -884,9 +884,35 @@ function openModalForDate(dateKey){
 }
 
     function closeModal(){ modalOverlay.style.display='none'; }
-
+    function startOfWeek(d){ 
+    const dd=new Date(d); 
+    const day=dd.getDay(); // 0 is Sunday, 1 is Monday...
+    
+    // To get the date of the most recent Sunday, subtract the current day index.
+    // Example: If today is Tuesday (day=2), 
+    // dd.getDate() - 2 points to two days ago (Sunday).
+    const diff = dd.getDate() - day; 
+    
+    dd.setDate(diff); 
+    dd.setHours(0,0,0,0); 
+    return dd 
+}
+    
     let currentYear=(new Date()).getFullYear(), currentMonth=(new Date()).getMonth();
-    function startOfWeek(d){ const dd=new Date(d); const day=dd.getDay(); const diff = dd.getDate() - day + (day===0?-6:1); dd.setDate(diff); dd.setHours(0,0,0,0); return dd }
+    function startOfWeek(d){ 
+    const dd=new Date(d); 
+    const day=dd.getDay(); // 0 is Sunday, 1 is Monday...
+    
+    // To get the date of the most recent Sunday, subtract the current day index.
+    // Example: If today is Tuesday (day=2), 
+    // dd.getDate() - 2 points to two days ago (Sunday).
+    const diff = dd.getDate() - day; 
+    
+    dd.setDate(diff); 
+    dd.setHours(0,0,0,0); 
+    return dd 
+    }
+    
     function sumSecondsForDate(y,m,d){ 
         const key = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; 
         const arr = sessionsCache[key]||[]; 

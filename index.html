@@ -735,7 +735,8 @@ function getLocalDateKey(d = new Date()) {
         el.className='session';
         el.dataset.id = s.id; 
         el.dataset.date = todayKey;
-        el.innerHTML = `<div class="left"><div class="time-s">${fmtTime(s.start)}</div><div class="dur">── ${Math.round(s.secs/60)} min ──</div></div><div class="actions"></div><div class="right">${fmtTime(s.end)}</div>`;
+        el.innerHTML = `<div class="left"><div class="time-s">${fmtTime(s.start)}</div><div class="dur">── ${formatSessionDuration(s.secs)} ──</div></div><div class="actions"></div><div class="right">${fmtTime(s.end)}</div>`;
+        
         sessionList.appendChild(el);
         attachSwipeHandlers(el, todayKey, s.id);
       });

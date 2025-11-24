@@ -526,7 +526,8 @@
     // --- APPLICATION LOGIC ---
     let running=false, startTs=null, timerId=null;
     const startBtn=document.getElementById('startBtn');
-    const miniToday=document.getElementById('miniToday');
+    const miniToday = { classList: { add:()=>{}, remove:()=>{}, toggle:()=>{} }, style: {}, innerHTML: '' };
+    
     const sessionList=document.getElementById('sessionList');
     const sumTodayEl=document.getElementById('sumToday');
     const sumWeekEl=document.getElementById('sumWeek');

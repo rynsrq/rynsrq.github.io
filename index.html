@@ -171,10 +171,27 @@
     .weekdays div{flex:1;text-align:center;font-size:12px}
     .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
     .circle-day{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.03);color:var(--muted);margin:auto;font-weight:700;position:relative;font-size:13px;transition:all .18s ease}
+    /* "Today" Circle - Gradient Border Trick */
     .circle-day.today {
-      outline: 2px linear-gradient(135deg, #5ffbf1, #24d3dd); /* Cyan border */
+      /* 1. Make the physical border transparent to show the gradient underneath */
+      border: 3px solid transparent;
+
+      /* 2. THE TRICK: Layer two backgrounds.
+         - Top Layer: Faint cyan fill (clipped to inside/padding-box)
+         - Bottom Layer: Cyan Gradient (clipped to whole box/border-box)
+      */
+      background-image: linear-gradient(rgba(36, 211, 221, 0.15), rgba(36, 211, 221, 0.15)), 
+                        linear-gradient(135deg, #5ffbf1, #24d3dd);
+      
+      background-origin: padding-box, border-box;
+      background-clip: padding-box, border-box;
+
+      /* 3. Text and Glow */
       color: var(--accent);
-      background: rgba(36, 211, 221, 0.1); /* Faint cyan glow inside */
+    /*  box-shadow: 0 0 15px rgba(36, 211, 221, 0.4); */
+      
+      /* Remove any old outlines */
+      outline: none;
     }
 
     /* Days with sessions - Style matching Start Peel */

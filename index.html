@@ -188,10 +188,14 @@
       
       /* 2. Neon Glow */
       /* box-shadow: 0 0 15px rgba(36, 211, 221, 0.5); */
-      border: 1px #656565;
+      
       /* 3. Text Color */
       color: #000000;
       font-weight: 800;
+      border: 4px solid rgba(255, 255, 255, 0.03);
+      
+      /* Ensures the background doesn't bleed under the border */
+      background-clip: padding-box;
     }
     .month-block{margin-bottom:20px}
     .month-label{font-size:18px;margin:6px 0;color:var(--white)}

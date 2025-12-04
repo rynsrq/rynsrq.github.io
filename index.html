@@ -56,6 +56,12 @@
       background: #121212 !important;
       border: 1px solid rgba(255,255,255,0.08);
     }
+    /* Make the clock look exactly like the Page Title */
+    #clock {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--white); /* Ensures it is white, not muted gray */
+    }
     .session .left{display:flex;gap:10px;align-items:center}
     .session .time-s{font-weight:700;font-size:15px}
     .session .dur {
@@ -247,9 +253,8 @@
     <header>
       <div>
         <h1 id="pageTitle">Home</h1>
-        <div class="sub" id="subTitle">Today</div>
       </div>
-      <div class="sub" id="clock">--:--</div>
+      <div id="clock">--:--</div> 
     </header>
 
     <!-- HOME -->

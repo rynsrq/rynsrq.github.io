@@ -173,7 +173,7 @@
     .circle-day{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.03);color:var(--muted);margin:auto;font-weight:700;position:relative;font-size:13px;transition:all .18s ease}
     /* "Today" Circle - Gradient Border Trick */
     .circle-day.today {
-      outline: 2px var(--accent);
+      outline: 2px solid var(--accent);
 
       color: var(--accent);
 
@@ -1071,7 +1071,7 @@ function openModalForDate(dateKey){
         if((sessionsCache[cellDateStr] || []).length > 0) circle.classList.add('has-session');
        // Use the function that respects the device's current date/time
         const todayStr = getLocalDateKey(); 
-        if(cellDateStr===todayStr) circle.classList.add('today');
+        if(cellDateStr===todayStr && !running) circle.classList.add('today');
         
         
         circle.addEventListener('click', ()=>{ openModalForDate(cellDateStr); });

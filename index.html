@@ -6,15 +6,21 @@
   <title>Study Tracker</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
   <style>
-    :root{
-      --bg:#2f2418;
-      --surface:#231a12;
-      --panel:#3b3026;
-      --muted:#b8a995;
-      --accent:#f6c9d2; /* start peel color */
-      --accent-text:#241916; /* text color on accent */
-      --white:#fff6f6;
-      --radius:14px;
+    :root {
+      /* Deep Dark Backgrounds */
+      --bg: #050505;        /* Near pitch black */
+      --surface: #101010;   /* Very dark grey for bottom nav */
+      --panel: #161616;     /* Slightly lighter for cards */
+      
+      /* Text Colors */
+      --white: #ffffff;
+      --muted: #656565;     /* Darker, subtle grey text */
+      
+      /* The "Max" Accent (Cyan/Teal) */
+      --accent: #24d3dd;    /* Vibrant Cyan */
+      --accent-text: #000000; /* Black text on cyan buttons */
+      
+      --radius: 14px;
       --safe-bottom: env(safe-area-inset-bottom, 12px);
     }
     *{box-sizing:border-box}
@@ -29,28 +35,36 @@
     header h1{font-size:20px;margin:0;font-weight:700}
     header .sub{font-size:12px;color:var(--muted)}
     .list{display:flex;flex-direction:column;gap:10px;margin-top:8px}
-    .session{
-    display:flex;
-    align-items:center;
-    justify-content:space-between; /* Keep this to separate start/end times */
-    padding:10px 10px;
-    border-radius:12px;
-    min-height:48px;
-    transition:transform .18s ease;
-    background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-    color:var(--white);
-    font-size:14px;
+    .session {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 10px;
+      border-radius: 12px;
+      min-height: 48px;
+      transition: transform .18s ease;
+      
+      /* NEW MAX STYLE: Dark background, thin border, no brown gradient */
+      background: #121212; 
+      border: 1px solid rgba(255, 255, 255, 0.08); 
+      
+      color: var(--white);
+      font-size: 14px;
     }
-    
+    /* Force summary cards to be dark grey with a border */
+    #summaryRow > div {
+      background: #121212 !important;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
     .session .left{display:flex;gap:10px;align-items:center}
     .session .time-s{font-weight:700;font-size:15px}
     .session .dur {
-    flex-grow: 1; /* Allows the duration element to take up all available central space */
-    text-align: center; /* Centers the text within that space */
-    color: var(--muted);
-    font-size: 13px;
-    margin: 0 10px; /* Optional: adds horizontal padding */
-}
+        flex-grow: 1;
+        text-align: center;
+        color: #888; /* Slightly lighter grey than before */
+        font-size: 13px;
+        margin: 0 10px;
+    }
 /* Ensure start/end times are correctly aligned */
     .session .actions{display:flex;gap:8px;align-items:center}
     .session .session-time {
@@ -66,7 +80,31 @@
     .btn.danger{border-color:rgba(255,80,80,0.3);color:#ffb8b8}
     .session.swiped{transform:translateX(-82px)}
     /* Start FAB (peel) */
-    .fab{position:fixed;right:14px;bottom:120px;background:var(--accent);color:var(--accent-text);padding:12px 18px;border-radius:28px;box-shadow:0 10px 30px rgba(0,0,0,0.35);display:flex;gap:8px;align-items:center;font-weight:700;border:0;z-index:40;font-size:14px}
+    .fab {
+      position: fixed;
+      right: 14px;
+      bottom: 120px;
+      
+      /* Gradient Cyan Background */
+      background: linear-gradient(135deg, #5ffbf1, #24d3dd);
+      color: #000000; /* Black text */
+      
+      padding: 12px 18px;
+      border-radius: 28px;
+      
+      /* The Neon Glow Effect */
+      box-shadow: 0 0 15px rgba(36, 211, 221, 0.4); 
+      
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font-weight: 800; /* Thicker font */
+      border: 0;
+      z-index: 40;
+      font-size: 14px;
+      min-width: 120px;
+      justify-content: center;
+    }
     .fab svg{width:18px;height:18px}
     /* MINI TODAY pill — made identical to FAB but placed on left */
     .mini-today{
@@ -96,7 +134,11 @@
     .weekdays div{flex:1;text-align:center;font-size:12px}
     .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
     .circle-day{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.03);color:var(--muted);margin:auto;font-weight:700;position:relative;font-size:13px;transition:all .18s ease}
-    .circle-day.today{outline:3px solid rgba(245,183,198,0.18)}
+    .circle-day.today {
+      outline: 2px solid var(--accent); /* Cyan border */
+      color: var(--accent);
+      background: rgba(36, 211, 221, 0.1); /* Faint cyan glow inside */
+    }
     /* session-day uses same color as start peel */
     .circle-day.has-session{
       background: var(--accent);
@@ -148,9 +190,33 @@
     }
 
 
-    .bottom-nav{position:fixed;left:0;right:0;bottom:0;height:76px;background:#3b2f24;display:flex;gap:8px;align-items:center;justify-content:space-around;padding:12px;border-top-left-radius:12px;border-top-right-radius:12px;z-index:39}
+    .bottom-nav {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 76px;
+      
+      /* Dark Background */
+      background: #000000;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-around;
+      padding: 12px;
+      border-top-left-radius: 12px;
+      border-top-right-radius: 12px;
+      z-index: 39;
+    }
     .nav-item{flex:1;text-align:center;color:var(--muted);font-weight:700;padding:8px;border-radius:12px}
-    .nav-item.active{background:#2a2118;padding:10px;border-radius:18px;color:var(--white)}
+    .nav-item.active {
+      background: rgba(36, 211, 221, 0.15); /* Low opacity cyan bg */
+      padding: 10px;
+      border-radius: 18px;
+      color: var(--accent); /* Cyan Text */
+    }
     @media (max-width:360px){
       .app{padding:12px 10px calc(120px + var(--safe-bottom));}
       .session{padding:10px}

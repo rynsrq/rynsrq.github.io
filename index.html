@@ -858,16 +858,6 @@ function getLocalDateKey(d = new Date()) {
       
 
       sessionList.innerHTML='';
-
-      if(running && startTs){ 
-        const virtual=document.createElement('div'); 
-        virtual.className='session virtual'; 
-        virtual.innerHTML=`<div class="left"><div class="time-s">${fmtTime(new Date(startTs).toISOString())}</div><div class="dur">── ${formatSessionDuration(0)} ──</div></div><div class="actions"></div><div class="right">${fmtTime(new Date().toISOString())}</div>`;
-        
-        sessionList.appendChild(virtual); 
-        attachSwipeHandlers(virtual, null, null); 
-      }
-
       arr.forEach((s)=>{
         const el=document.createElement('div'); 
         el.className='session';

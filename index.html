@@ -41,7 +41,12 @@
     color:var(--white);
     font-size:14px;
     }
-    
+    /* Make the clock look exactly like the Page Title */
+    #clock {
+      font-size: 18px;
+      font-weight: 650;
+      color: var(--white); /* Ensures it is white, not muted gray */
+    }
     .session .left{display:flex;gap:10px;align-items:center}
     .session .time-s{font-weight:700;font-size:15px}
     .session .dur {
@@ -165,9 +170,8 @@
     <header>
       <div>
         <h1 id="pageTitle">Home</h1>
-        <div class="sub" id="subTitle">Today</div>
       </div>
-      <div class="sub" id="clock">--:--</div>
+      <div id="clock">--:--</div> 
     </header>
 
     <!-- HOME -->
@@ -755,14 +759,7 @@ function getLocalDateKey(d = new Date()) {
 
       sessionList.innerHTML='';
 
-      if(running && startTs){ 
-        const virtual=document.createElement('div'); 
-        virtual.className='session virtual'; 
-        virtual.innerHTML=`<div class="left"><div class="time-s">${fmtTime(new Date(startTs).toISOString())}</div><div class="dur">── ${formatSessionDuration(0)} ──</div></div><div class="actions"></div><div class="right">${fmtTime(new Date().toISOString())}</div>`;
-        
-        sessionList.appendChild(virtual); 
-        attachSwipeHandlers(virtual, null, null); 
-      }
+      
 
       arr.forEach((s)=>{
         const el=document.createElement('div'); 

@@ -45,22 +45,24 @@
       transition: transform .18s ease;
       
       /* NEW MAX STYLE: Dark background, thin border, no brown gradient */
-      background: rgba(36, 211, 221, 0.15); 
-      border: 2px solid var(--accent); 
+      background: var(--accent); 
+      border: 1px solid var(--accent); 
       
-      color: var(--white);
+      color: var(--bg;
       font-size: 14px;
     }
     /* Force summary cards to be dark grey with a border */
     #summaryRow > div {
-      background: rgba(36, 211, 221, 0.15) !important;
-      border: 2px solid var(--accent) !important;
+      background: var(--accent) !important;
+      border: 1px solid var(--accent) !important;
     }
     /* Make the clock look exactly like the Page Title */
     #clock {
-      font-size: 20px;
+      font-size: 18px;
+      background: var(--accent);
+      border: 1px solid var(--accent);
       font-weight: 700;
-      color: var(--white); /* Ensures it is white, not muted gray */
+      color: var(--bg); /* Ensures it is white, not muted gray */
     }
     .session .left{display:flex;gap:10px;align-items:center}
     .session .time-s{font-weight:700;font-size:15px}
@@ -170,7 +172,7 @@
     .weekdays{display:flex;gap:6px;color:var(--muted);margin-bottom:8px}
     .weekdays div{flex:1;text-align:center;font-size:12px}
     .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
-    .circle-day{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.03);color:var(--muted);margin:auto;font-weight:700;position:relative;font-size:13px;transition:all .18s ease}
+    .circle-day{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(36, 211, 221, 0.15);color:var(--muted);margin:auto;font-weight:700;position:relative;font-size:13px;transition:all .18s ease}
     /* "Today" Circle - Gradient Border Trick */
     .circle-day.today {
       border-radius: 12px;
@@ -188,7 +190,7 @@
     .month-block{margin-bottom:20px}
     .month-label{font-size:18px;margin:6px 0;color:var(--white)}
     .months-row{display:flex;gap:8px;overflow:auto;padding:8px 4px}
-    .month-box{min-width:86px;padding:10px;border-radius:12px;background:rgba(36, 211, 221, 0.15);border: 2px solid var(--accent);text-align:center}
+    .month-box{min-width:86px;padding:10px;border-radius:12px;background:var(--accent);border: 1px solid var(--accent);text-align:center}
     .section{background:var(--panel);padding:12px;border-radius:12px;margin-top:12px}
     .section h3{margin:0 0 10px 0;color:var(--white);font-size:15px}
     .row{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:12px;background:rgba(255,255,255,0.02);margin-bottom:8px;font-size:14px}

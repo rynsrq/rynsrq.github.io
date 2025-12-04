@@ -92,11 +92,30 @@
       font-size: 14px;
       transition: all 0.2s ease;
     }
+    /* Log Out Button - Styled exactly like Start Peel */
     .btn.danger {
-      background: #24d3dd; /* Very faint Cyan background */
-      border: 1px solid #24d3dd;          /* Bright Cyan Border */
-      color: #050505;                     /* Bright Red Text */
-     }
+      /* 1. The Cyan Gradient Background */
+      background: linear-gradient(135deg, #5ffbf1, #24d3dd);
+      
+      /* 2. Black Text */
+      color: #000000;
+      
+      /* 3. The Neon Glow */
+      box-shadow: 0 0 15px rgba(36, 211, 221, 0.4);
+      
+      /* 4. Shape & Size */
+      border: 0;
+      padding: 12px 18px;
+      border-radius: 28px;
+      font-weight: 800;
+      font-size: 14px;
+      min-width: 120px;
+      
+      /* 5. Centering */
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+    }
     .btn:active {
       transform: scale(0.96);
     }

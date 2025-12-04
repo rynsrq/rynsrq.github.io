@@ -101,7 +101,7 @@
       color: #000000;
       
       /* 3. The Neon Glow */
-      box-shadow: 0 0 15px rgba(36, 211, 221, 0.4);
+      /* box-shadow: 0 0 15px rgba(36, 211, 221, 0.4); */
       
       /* 4. Shape & Size */
       border: 0;
@@ -180,12 +180,18 @@
       color: var(--accent);
       background: rgba(36, 211, 221, 0.1); /* Faint cyan glow inside */
     }
-    /* session-day uses same color as start peel */
-    .circle-day.has-session{
-      background: var(--accent);
-      color: var(--accent-text);
-      box-shadow: 0 8px 20px rgba(0,0,0,0.18);
-      font-weight:800;
+
+    /* Days with sessions - Style matching Start Peel */
+    .circle-day.has-session {
+      /* 1. Cyan Gradient */
+      background: linear-gradient(135deg, #5ffbf1, #24d3dd);
+      
+      /* 2. Neon Glow */
+      box-shadow: 0 0 15px rgba(36, 211, 221, 0.5);
+      
+      /* 3. Text Color */
+      color: #000000;
+      font-weight: 800;
     }
     .month-block{margin-bottom:20px}
     .month-label{font-size:18px;margin:6px 0;color:var(--white)}

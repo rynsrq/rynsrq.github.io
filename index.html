@@ -1045,7 +1045,7 @@ function renderMonths(){
     initFirebase();
 
     window.addEventListener('resize', updateMiniVisibility);
-    setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',hour12: false}); updateMiniVisibility(); }, 1000);
+    setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); updateMiniVisibility(); }, 1000);
     document.addEventListener('keydown', (e)=>{ if(e.key===' ') { e.preventDefault(); startBtn.click(); } });
   </script>
 </body>

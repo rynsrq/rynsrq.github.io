@@ -558,7 +558,7 @@ function getLocalDateKey(d = new Date()) {
     function pad(n){ return String(n).padStart(2,'0') }
     function secsToHMS(total){ total=Math.floor(total); const h=Math.floor(total/3600); const m=Math.floor((total%3600)/60); const s=total%60; return `${pad(h)}:${pad(m)}:${pad(s)}` }
     function shortHours(total){ if(!total) return '0h 0m'; const h=Math.floor(total/3600); const m=Math.floor((total%3600)/60); return `${h}h ${m}m` }
-    function fmtTime(iso){ const d=new Date(iso); return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+    function fmtTime(iso){ const d=new Date(iso); return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit', hour12: false}); }
     function formatSessionDuration(totalSecs){
     if (totalSecs < 60) return '0 min'; // For very short sessions
     
@@ -1045,7 +1045,7 @@ function renderMonths(){
     initFirebase();
 
     window.addEventListener('resize', updateMiniVisibility);
-    setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); updateMiniVisibility(); }, 1000);
+    setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit', hour12: false}); updateMiniVisibility(); }, 1000);
     document.addEventListener('keydown', (e)=>{ if(e.key===' ') { e.preventDefault(); startBtn.click(); } });
   </script>
 </body>

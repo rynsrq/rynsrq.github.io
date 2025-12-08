@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en-GB">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
@@ -1045,7 +1045,7 @@ function renderMonths(){
     initFirebase();
 
     window.addEventListener('resize', updateMiniVisibility);
-    setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); updateMiniVisibility(); }, 1000);
+    setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'}); updateMiniVisibility(); }, 1000);
     document.addEventListener('keydown', (e)=>{ if(e.key===' ') { e.preventDefault(); startBtn.click(); } });
   </script>
 </body>
